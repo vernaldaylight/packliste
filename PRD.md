@@ -1,9 +1,9 @@
 # Packliste — Product Requirements Document
 
-**Version**: 1.0
+**Version**: 1.1
 **Datum**: 2026-10-07
 **Autor**: Sarah
-**Status**: Draft
+**Status**: Abgestimmt — bereit für die Umsetzung
 **Sprache der App**: Deutsch
 
 ---
@@ -29,7 +29,7 @@ Eine Web-App, die aus einem festen Item-Katalog und einem beschriebenen Reise-Pr
 
 ### Umfang & Ressourcen
 - Solo-Projekt, Web-Frontend, kein Backend, keine Datenbank
-- Persistenz: lokale JSON-Datei
+- Persistenz: zwei lokale JSON-Dateien (`katalog.json`, `reisen.json`)
 - Herkunft: Praxisprojekt im Agentic-Coding-Kurs, danach dauerhafte private Nutzung
 
 ---
@@ -71,8 +71,8 @@ Die Spalten der Tabelle mischen **zwei Achsen**:
 
 | Achse | Bedeutung | Beispiele | Rolle im System |
 |---|---|---|---|
-| **Kategorie** | Was für ein Ding ist das? | Kleidung, Technik, Kosmetik, Medizin, Schuhe | **Gruppierung** der fertigen Liste |
-| **Kontext** | Wo bin ich / was mache ich? | Winter, Sommer, Festival, Allgemein, Tauchen, Camping | **Filter** der Auswahl |
+| **Kategorie** | Was für ein Ding ist das? | Kleidung, Schuhe, Technik, Medizin, Tauchausrüstung | **Gruppierung** der fertigen Liste |
+| **Kontext** | Wo bin ich / was mache ich? | Winter, Tauchen, Flugzeug, Hotel, Allgemein | **Filter** der Auswahl |
 
 Diese Trennung ist der Kern des Produkts. Kategorien sagen, *wie die Liste sortiert wird*; Kontexte sagen, *was überhaupt darauf gehört*. Sobald die Achsen getrennt sind, folgt die Auswahllogik fast von selbst.
 
@@ -109,8 +109,8 @@ Für unbekannte Aktivitäten lässt sich ein neuer Tag frei eintippen — die Ap
 | F6 | Manuelles Nachjustieren pro Reise (ohne Katalogänderung) | P0 |
 | F7 | Excel/CSV-Import des bestehenden Bestands | P0 |
 | F8 | Freie neue Tags/Aktivitäten im Reise-Formular anlegen | P0 |
-| F9 | Liste als Text/Markdown exportieren | P1 |
-| F10 | Verkehrsmittel als Tag-Quelle (kein Regelwerk) | P0 |
+| F9 | Verkehrsmittel als Tag-Quelle (kein Regelwerk) | P0 |
+| F10 | Liste als Text/Markdown exportieren | P1 |
 | F11 | Reise speichern und später wieder öffnen | P1 |
 | F12 | Nach-der-Reise-Retro: "Was hat gefehlt?" | P1 |
 
@@ -125,7 +125,7 @@ Für unbekannte Aktivitäten lässt sich ein neuer Tag frei eintippen — die Ap
 
 ### 3.5 MVP-Definition
 
-**Kernumfang**: F1–F8.
+**Kernumfang**: alle P0-Features — F1–F9.
 **Fertig, wenn**: Eine echte vergangene Reise im Formular eingegeben wird und die generierte Liste ohne manuelles Hinzufügen fehlender Kern-Items zum Packen taugt.
 **Lernziele**: Trägt das Zwei-Achsen-Modell wirklich? Sind die Mengenregeln ausdrucksstark genug? Wie viel Nacharbeit bleibt realistisch?
 
@@ -165,6 +165,8 @@ Drei Varianten, decken alle realistischen Fälle ab:
 
 **Formel**: `menge = min(ceil(reisetage / pro_tage) * n, max)`
 
+Der Editor zeigt die Rohfelder direkt — `n`, `pro_tage`, `max` — ohne Assistenten. Dazu läuft eine Live-Vorschau: „= 4 Stück für 10 Tage". Rohfelder zum Einstellen, Vorschau zum Fehlerfangen.
+
 **Verbrauchsmaterial** (Sonnencreme, Shampoo, Zahnpasta) nutzt `fest`. Verbrauch wird nicht pro Tag hochgerechnet — eine Packung reicht für eine Reise. Bei sehr langen Reisen wird die Zahl manuell erhöht. Das deckt den realen Fall ab, ohne ein Verbrauchsmodell zu brauchen.
 
 ### 4.3 Reise
@@ -176,17 +178,18 @@ Reise {
   ziel?: string
   von: date
   bis: date                       // -> reisetage
-  saison: "Winter" | "Sommer" | "Übergang" | ...
+  saison: "Winter" | "Sommer" | "Übergangszeit"
   aktivitaeten: string[]          // ["Tauchen", "Schnorcheln"]
   verkehrsmittel: "Flugzeug" | "Auto" | "Zug"
+  unterkunft: "Camping" | "Ferienwohnung" | "Hotel" | "Hostel" | "Freunde"
   zusatz_tags: string[]           // manuell ergänzt/entfernt
 }
 ```
 
-Das **Verkehrsmittel ist kein Sonderfall, sondern eine Tag-Quelle.** Es gibt kein Regelwerk und keine Warnungen: `Flugzeug` ist ein Tag wie jeder andere, und Items wie Nackenkissen, Wollsocken oder der 1-L-Zip-Beutel tragen ihn. Wer mit dem Auto fährt, bekommt diese Items einfach nicht — und dafür alle Items mit Tag `Auto`.
+**Verkehrsmittel und Unterkunft sind keine Sonderfälle, sondern Tag-Quellen.** Es gibt kein Regelwerk und keine Warnungen: `Flugzeug` ist ein Tag wie jeder andere, und Items wie Nackenkissen, Wollsocken oder der 1-L-Zip-Beutel tragen ihn. Wer mit dem Auto fährt, bekommt diese Items einfach nicht — und dafür alle Items mit Tag `Auto`. Dasselbe gilt für die Unterkunft: Wer im Hotel schläft, braucht kein Handtuch und keinen Föhn.
 
 Die **abgeleiteten Reise-Tags** sind die Vereinigung aus:
-`{saison} ∪ aktivitaeten ∪ {verkehrsmittel} ∪ zusatz_tags ∪ {"Allgemein"}`
+`{saison} ∪ aktivitaeten ∪ {verkehrsmittel} ∪ {unterkunft} ∪ zusatz_tags ∪ {"Allgemein"}`
 
 ### 4.4 Packliste (Ergebnis)
 
@@ -234,7 +237,7 @@ Jede Datei trägt `version` für spätere Migrationen. Vor jedem Schreiben wird 
 ### 5.1 Algorithmus
 
 ```
-tripTags = {saison} ∪ aktivitaeten ∪ {verkehrsmittel} ∪ zusatz_tags ∪ {"Allgemein"}
+tripTags = {saison} ∪ aktivitaeten ∪ {verkehrsmittel} ∪ {unterkunft} ∪ zusatz_tags ∪ {"Allgemein"}
 
 für jedes item im Katalog:
     wenn item.nicht_mit ∩ tripTags ≠ ∅   -> überspringen
@@ -251,15 +254,15 @@ sortieren: Kategorien in fester Reihenfolge, Items alphabetisch
 
 ### 5.2 Beispiel
 
-Reise: 10 Tage, Saison `Sommer`, Aktivität `Tauchen`, Verkehrsmittel `Flugzeug`
-→ `tripTags = {Sommer, Tauchen, Flugzeug, Allgemein}`
+Reise: 10 Tage, Saison `Sommer`, Aktivität `Tauchen`, Verkehrsmittel `Flugzeug`, Unterkunft `Ferienwohnung`
+→ `tripTags = {Sommer, Tauchen, Flugzeug, Ferienwohnung, Allgemein}`
 
 | Item | Kategorie | Tags | Ergebnis |
 |---|---|---|---|
 | T-Shirt | Kleidung | Sommer, Allgemein | ✅ 4× (1/3 Tage, max 6) |
 | Badehose | Kleidung | Sommer, Tauchen | ✅ 2× |
 | Tauchanzug | Tauchausrüstung | Tauchen | ✅ 1× |
-| Nackenkissen | Sonstiges | Flugzeug | ✅ 1× |
+| Nackenkissen | Haushalt & Sonstiges | Flugzeug | ✅ 1× |
 | Zip-Beutel 1 l | Taschen & Ordnung | Flugzeug | ✅ 1× |
 | Wanderschuhe | Schuhe | Winter, Camping | ❌ kein Treffer |
 | Zahnbürste | Kosmetik & Pflege | Allgemein | ✅ 1× |
@@ -272,10 +275,12 @@ Die letzten beiden Zeilen zeigen, warum Verkehrsmittel-als-Tag besser ist als ei
 Ein Item kann Tags haben, die es **aktiv ausschließen**:
 
 ```
-Item "Shorts" { tags: ["Sommer"], nicht_mit: ["Winter"] }
+Item "Badehose" { tags: ["Sommer", "Strand"], nicht_mit: ["Städtetrip"] }
 ```
 
-**Priorität**: P1, nicht P0. Die Tag-Schnittmenge deckt die meisten Fälle bereits ab — ein Item, das nur `Sommer` trägt, landet ohnehin nicht auf der Winterreise. Ausschluss-Tags werden erst gebraucht, wenn ein Item einen breiten Tag trägt, aber in bestimmten Situationen nicht gilt. Das Feld wird im Datenmodell von Anfang an vorgesehen, damit keine Migration nötig wird; die UI dafür kommt erst, wenn der Bedarf real auftritt.
+**Wann das gebraucht wird**: Positive Tags reichen weiter, als es zunächst scheint. Ein Handtuch, das nur `Camping` und `Ferienwohnung` trägt, landet bei einer Hotelreise ohnehin nicht auf der Liste — es braucht kein `nicht_mit: ["Hotel"]`. Der Ausschluss wird erst gebraucht, wenn ein Item **notwendigerweise** einen breiten Tag trägt, in einer bestimmten Situation aber trotzdem nicht mitkommt. Die Badehose oben ist genau dieser Fall: `Sommer` muss sie tragen, damit sie im Sommerurlaub dabei ist — aber auf einem Städtetrip im Sommer ist sie Ballast.
+
+**Priorität**: P1, nicht P0. Das Feld wird im Datenmodell von Anfang an vorgesehen, damit keine Migration nötig wird; die UI dafür kommt erst, wenn der Bedarf beim Pflegen des echten Katalogs auftritt.
 
 ---
 
@@ -301,9 +306,9 @@ Eine Zuordnungstabelle (welche Spalte ist Kategorie, welche ist Kontext) wird be
 - **Mehrere X in Kategorie-Spalten** → Konflikt. Erste Spalte gewinnt, der Fall landet im Import-Report.
 - **Kein X in einer Kategorie-Spalte** → `kategorie = "Sonstiges"`, landet im Report.
 - **Mengenregel** → beim Import `einmal` als Default; der Nutzer pflegt die Ausnahmen danach gezielt nach.
-- **Tag `Tauchen`** → Items mit diesem Tag bekommen beim Import *nicht* automatisch die Kategorie `Tauchausrüstung`. Der Report listet sie zur manuellen Prüfung, weil Tauchzubehör je nach Item auch unter `Technik` (Tauchcomputer) oder `Sonstiges` (Netzbeutel) gehören kann.
+- **Tag `Tauchen`** → Items mit diesem Tag bekommen beim Import *nicht* automatisch die Kategorie `Tauchausrüstung`. Der Report listet sie zur manuellen Prüfung, weil in der Spalte `Tauchen` auch Dinge stecken können, die keine Ausrüstung sind (Netzbeutel, Handtuch, Booties).
 
-### 6.4 Vorbereitung der Quelldatei
+### 6.3 Vorbereitung der Quelldatei
 
 Zwei Fallen, die vor dem ersten Import geklärt sein müssen:
 
@@ -311,7 +316,7 @@ Zwei Fallen, die vor dem ersten Import geklärt sein müssen:
 
 **Trennzeichen.** Deutsches Excel exportiert CSV standardmäßig mit **Semikolon** und Dezimalkomma, nicht mit Komma. Der Importer erkennt beide Trennzeichen automatisch. Export als **CSV UTF-8**, damit Umlaute (ä, ö, ü, ß) in Item-Namen und Tags nicht kaputtgehen.
 
-### 6.3 Import-Report
+### 6.4 Import-Report
 
 Der Import endet mit einer Zusammenfassung: Anzahl importierter Items, Konflikte, Items ohne Kategorie, unbekannte Spalten. Der Report ist Pflicht — ein stiller Fehlimport vergiftet den ganzen Katalog, und das fällt erst Wochen später auf.
 
@@ -343,7 +348,7 @@ Der Import endet mit einer Zusammenfassung: Anzahl importierter Items, Konflikte
 > Als Nutzerin möchte ich eine Reise in einem Formular beschreiben, damit die App weiß, was ich brauche.
 
 **Akzeptanzkriterien**
-- [ ] Felder: Name, Ziel, Zeitraum, Saison, Aktivitäten, Verkehrsmittel
+- [ ] Felder: Name, Ziel, Zeitraum, Saison, Aktivitäten, Verkehrsmittel, Unterkunft
 - [ ] Reisetage werden aus dem Zeitraum berechnet und angezeigt
 - [ ] Abgeleitete Tags sind sichtbar und einzeln entfernbar
 - [ ] Neuen Tag/Aktivität frei eintippen und für die Reise verwenden
@@ -454,10 +459,10 @@ Bewusst keine Vanity-Metriken: Bei einem Solo-Werkzeug zählt nur, ob das eigene
 | Excel-Import liefert Müll | Hoch | Hoch | Import-Report, Trockenlauf, Original unangetastet lassen |
 | Übermodellierung der Tags | Mittel | Mittel | Tags bleiben Strings; Kategorien bleiben eine flache Liste |
 | Regel-Engine stößt an Grenzen | Mittel | Mittel | Overrides pro Reise (US-05) als Ventil, nicht als Regel-Erweiterung |
-| Datenverlust (eine JSON-Datei) | Niedrig | Hoch | Backup vor jedem Schreiben, Export-Funktion |
+| Datenverlust des Katalogs | Niedrig | Hoch | Getrennte `katalog.json`, Backup vor jedem Schreiben, `katalog.json` unter git, Export als Notausgang |
 | Scope Creep durch Future Features | Hoch | Mittel | Dieses Dokument; Future Features bleiben ausgeschlossen |
 | Migrationsaufwand frustriert vor dem ersten Nutzen | Mittel | Hoch | Import ist P0 — Nutzen muss in Woche 2 erreichbar sein |
-| Mengenregeln sind zu grob für Verbrauchsmaterial | Mittel | Niedrig | Offene Frage O6; zur Not `fest` als Rückfall |
+| Kategorien tragen nicht (11 sind zu viele oder zu wenige) | Mittel | Mittel | Kategorien sind reine Strings; Umbenennen und Zusammenführen ist ein Datensatz-Fix, kein Umbau. Erste Bewährung: der Import der echten Tabelle |
 
 ---
 
@@ -481,15 +486,17 @@ Solo, Abendarbeit, parallel zum Kurs. Vier Wochen bis nutzbarer MVP.
 | # | Frage | Entscheidung |
 |---|---|---|
 | O1 | Eine JSON-Datei oder eine pro Entität? | ✅ **Zwei**: `katalog.json` (wertvoll) und `reisen.json` (regenerierbar). Siehe §4.5 |
-| O2 | Wie wird eine Mengenregel editiert? | ✅ **Gelöst, keine offene Frage.** Drei Radiobuttons, genau einer aktiv, bei `fest` und `pro_tage` werden ein bzw. zwei Zahlenfelder eingeblendet. Aufwand: ~20 Zeilen Komponente |
+| O2 | Wie wird eine Mengenregel editiert? | ✅ **Gelöst.** Drei Radiobuttons, genau einer aktiv; bei `fest` und `pro_tage` werden die Zahlenfelder eingeblendet — **Rohfelder, kein Assistent.** Dazu Live-Vorschau „= 4 Stück für 10 Tage" |
 | O3 | Kann ein Item mehrere Kategorien haben? | ✅ **Nein, genau eine.** Diving-Gear bekommt die eigene Kategorie `Tauchausrüstung` |
 | O4 | Ausschluss-Tags schon im MVP? | ✅ **Feld jetzt, UI später** — wie in §5.3 |
 | O5 | Packliste als Snapshot oder live berechnet? | ✅ **Snapshot.** Sonst gehen Overrides (F6) und Häkchen (F5) bei jedem Render verloren |
 | O6 | Verbrauchsmaterial pro Tag rechnen? | ✅ **Nein.** `fest` genügt — siehe §4.2 |
 | O7 | Verkehrsmittel: Sperre, Warnung oder Tag? | ✅ **Tag.** Kein Regelwerk, keine Warnungen — siehe §4.3 |
-| O8 | Kategorien im Import aus Spalten oder Mapping-Tabelle? | Offen — wird beim Import-Spike entschieden |
-| O9 | Grundreihenfolge der Kategorien in der Ausgabe? | Offen — Vorschlag in Anhang B |
-| O10 | Werden Tags in der UI gruppiert dargestellt (Klima, Verkehr, Aktivität)? | Offen — Gruppierung ist reine Darstellung, die Speicherung bleibt flach |
+| O8 | Kategorien im Import aus Spalten oder Mapping-Tabelle? | Offen — technische Detailfrage, wird beim Import-Spike entschieden. Blockiert nichts |
+| O9 | Grundreihenfolge der Kategorien in der Ausgabe? | ✅ **Die Reihenfolge aus Anhang B.1**: Dokumente & Wertsachen zuerst, Sonstiges zuletzt |
+| O10 | Tags in der UI gruppiert darstellen? | ✅ **Ja, gruppiert** (Klima, Verkehr, Aktivität, Unterkunft). Gespeichert wird flach — die Gruppierung ist reine Darstellung und ändert das Datenmodell nicht |
+
+**Nur noch eine Frage ist wirklich offen** (O8), und sie ist technisch statt fachlich. Das fachliche Fundament steht.
 
 ---
 
@@ -565,7 +572,7 @@ Welche Items kommen nie mit? Was wurde noch nie benutzt? → Katalog ausdünnen.
 
 ### B. Kategorien und Tags
 
-> **Status: Vorschlag, in Abstimmung.** Spalte *Quelle*: `Excel` = war in der Tabelle vorhanden, `neu` = Ergänzung.
+> **Status: abgestimmt (2026-10-07).** Spalte *Quelle*: `Excel` = war in der Tabelle vorhanden, `neu` = Ergänzung.
 
 #### B.1 Kategorien
 
@@ -577,16 +584,15 @@ Reihenfolge = Anzeigereihenfolge. Essentials zuerst, Ausrüstung in der Mitte, S
 | 2 | Kleidung | Excel | Größte Kategorie; bleibt vorerst eine |
 | 3 | Schuhe | Excel | Zu Recht separat — braucht viel Platz, eigener Packschritt |
 | 4 | Kosmetik & Pflege | Excel | Um Hygiene erweitert (Duschgel, Zahnbürste, Handtuch) |
-| 5 | Medikamente | Excel (Teil) | **Persönliche** Medikamente. Höchste Kritikalität, meist reiseunabhängig → oft Tag `Allgemein` |
-| 6 | Reiseapotheke | Excel (Teil) | Pflaster, Schmerzmittel, Elektrolyte. Verhält sich anders als persönliche Medikamente → eigene Kategorie |
-| 7 | Technik | Excel | Ladegeräte, Adapter, Powerbank, Kamera, Laptop |
-| 8 | **Tauchausrüstung** | neu | Ausdrücklicher Wunsch. Nimmt Tauchanzug, Maske, Flossen, Tauchcomputer, Lampe auf |
-| 9 | **Campingausrüstung** | neu | Zelt, Schlafsack, Isomatte, Kocher, Lampe. War als Tag vorhanden, aber ohne Kategorie |
-| 10 | **Taschen & Ordnung** | neu | Rucksack, Kulturbeutel, Tagesrucksack, Packwürfel, **Zip-Beutel**. Die Behälter selbst sind Packgüter |
-| 11 | **Verpflegung** | neu | Snacks, Trinkflasche, Tee, Kaffee. Relevant für Camping, Flug, Zug |
-| 12 | Haushalt & Sonstiges | neu | Catch-all: Wäscheleine, Nähzeug, Schirm, Taschenmesser |
+| 5 | Medizin | Excel | Persönliche Medikamente **und** Reiseapotheke in einer Kategorie. Meist reiseunabhängig → häufig Tag `Allgemein` |
+| 6 | Technik | Excel | Ladegeräte, Adapter, Powerbank, Kamera, Laptop |
+| 7 | **Tauchausrüstung** | neu | Ausdrücklicher Wunsch. Nimmt Tauchanzug, Maske, Flossen, Booties, **Tauchcomputer, Lampe** auf |
+| 8 | **Campingausrüstung** | neu | Zelt, Schlafsack, Isomatte, Kocher, Lampe. War als Tag vorhanden, aber ohne Kategorie |
+| 9 | **Taschen & Ordnung** | neu | Rucksack, Kulturbeutel, Tagesrucksack, Packwürfel, **Zip-Beutel**. Die Behälter selbst sind Packgüter |
+| 10 | Verpflegung | neu | Snacks, Trinkflasche, Tee, Kaffee. Relevant für Camping, Flug, Zug |
+| 11 | Haushalt & Sonstiges | neu | Catch-all: Wäscheleine, Nähzeug, Schirm, Taschenmesser |
 
-**Zu klären**: Reicht dir die Aufteilung `Medikamente` / `Reiseapotheke`, oder soll das eine Kategorie bleiben? Und brauchst du `Verpflegung` als eigene Kategorie, oder wandert das unter `Haushalt & Sonstiges`?
+**11 Kategorien.** Alle Entscheidungen sind getroffen; die Liste ist gefroren.
 
 #### B.2 Kontext-Tags
 
@@ -597,9 +603,12 @@ Gespeichert als flache Strings; gruppiert nur für die Darstellung im Formular.
 | **Basis** | Allgemein | Excel |
 | **Klima / Saison** | Winter, Sommer, Übergangszeit, Regen | Excel + neu (Übergangszeit, Regen) |
 | **Verkehrsmittel** | Flugzeug, Auto, Zug | neu |
-| **Aktivität** | Tauchen, Camping, Festival, Wandern, Strand, Ski, Städtetrip, Arbeit, Fotografie, Sport | Excel + neu |
-| **Anlass** | Hochzeit, Abendessen | neu |
-| **Unterkunft** | Ferienwohnung | neu |
+| **Aktivität** | Tauchen, Festival, Wandern, Strand, Ski, Städtetrip, Arbeit, Fotografie, Sport | Excel + neu |
+| **Unterkunft** | Camping, Ferienwohnung, Hotel, Hostel, Freunde | Excel + neu |
+
+`Camping` liegt unter **Unterkunft**, nicht unter Aktivität — man übernachtet beim Camping, das ist die Variable, die die Ausrüstung bestimmt. `Zelt` als eigener Tag entfällt damit.
+
+Eine **Anlass**-Gruppe entfällt ersatzlos.
 
 **Begründungen zu den neu vorgeschlagenen Tags**
 
@@ -615,8 +624,10 @@ Gespeichert als flache Strings; gruppiert nur für die Darstellung im Formular.
 | **Arbeit** | Laptop, Businesskleidung, Adapter — eigene Anforderung |
 | **Fotografie** | Kamera, Objektive, Speicherkarten, Stativ |
 | **Sport** | Laufschuhe, Fitnesszeug für Hotel/Urlaub |
-| **Hochzeit / Abendessen** | Anlass-Tags: "schick essen gehen" braucht ein Outfit, das keine Saison- oder Aktivitätsableitung liefert |
 | **Ferienwohnung** | Selbstversorgung: Küchenausstattung, Wäscheleine, Einkaufsbeutel. Ein Hotel braucht davon nichts |
+| **Hotel** | Gegenstück zur Ferienwohnung: keine Küche, dafür Handtücher und Föhn vorhanden. Handtuch und Föhn werden deshalb einfach *nicht* mit `Hotel` getaggt — sie brauchen kein `nicht_mit` |
+| **Hostel** | Wie Hotel, plus Schloss für Schließfach, Ohrstöpsel, Flip-Flops für Gemeinschaftsduschen |
+| **Freunde** | Übernachtung bei Bekannten: Geschenk, kein Handtuch nötig, dafür weniger Gepäck |
 
 **Bewusst nicht aufgenommen**: `Tropen`, `Winterurlaub`, `Business` — noch zu spekulativ. Tags lassen sich jederzeit frei eintippen (F3); wenn ein Tag nach drei Reisen immer noch fehlt, kommt er in diese Liste.
 
@@ -637,3 +648,12 @@ Dabei entstehen zwei Lücken, die der Import-Report (F7) ausweisen muss:
 | Datenbank im MVP | Für Einzelnutzer mit lokaler Datei kein Nutzen, nur Betriebsaufwand |
 | Mengen als Ja/Nein | Lässt den realen Fehlerfall "zu wenig für 10 Tage" bestehen |
 | Tags als feste Enum-Liste | Hätte genau das Feature verhindert, das der Nutzer ausdrücklich will: unbekannte Aktivitäten eintippen |
+
+---
+
+## 16. Änderungshistorie
+
+| Version | Datum | Änderung |
+|---|---|---|
+| 1.1 | 2026-10-07 | Verkehrsmittel von Regelwerk auf Tag umgestellt (F9). Persistenz auf zwei Dateien aufgeteilt (§4.5). `Camping` von Aktivität zu Unterkunft verschoben, `Anlass`-Gruppe entfernt. Kategorie `Tauchausrüstung` ergänzt, `Medikamente`/`Reiseapotheke` zu `Medizin` zusammengeführt. Katalog auf 11 Kategorien und 5 Tag-Gruppen gefroren (Anhang B). `nicht_mit` präzisiert: positive Tags decken mehr ab als zunächst angenommen (§5.3). O1–O7, O9, O10 entschieden |
+| 1.0 | 2026-10-07 | Erster Entwurf |
