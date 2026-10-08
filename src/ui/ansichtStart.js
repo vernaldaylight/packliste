@@ -3,12 +3,17 @@
  *
  * Fehlt der Katalog (erster Start, oder nachdem iOS den Script-Storage
  * geräumt hat), zeigt die App die Aufforderung statt einer leeren Liste.
- * Kein Datenverlust — der Master liegt im git (PRD §4.5).
+ * Kein Datenverlust — der Master liegt im privaten Daten-Repo (PRD §4.5).
+ *
+ * Beide Wege stehen hier nebeneinander: GitHub braucht Netz und Token, die
+ * Datei braucht keins von beidem. Auf einem frischen Gerät ohne Netz ist der
+ * Dateiweg der einzige, der noch geht.
  */
 
 import { h, karte, dateiWaehler, fmtZeitraum } from './dom.js';
 import { reisetage, tripTags, fortschritt, KATEGORIEN } from '../engine.js';
 import { importiereKatalog } from './dateien.js';
+import { zieheKatalog } from './syncUi.js';
 
 export function ansichtStart(zustand) {
   return zustand.katalog ? uebersicht(zustand) : importAufforderung(zustand);
@@ -16,7 +21,7 @@ export function ansichtStart(zustand) {
 
 /* --- FR19 ------------------------------------------------------------------ */
 
-function importAufforderung({ aktionen }) {
+function importAufforderung({ aktionen, laden }) {
   return h(
     'div',
     { class: 'stapel' },
@@ -26,25 +31,30 @@ function importAufforderung({ aktionen }) {
         'p',
         {},
         'Die App weiß noch nicht, was du besitzt. Der Katalog ist eine Datei — ',
-        h('code', {}, 'daten/katalog.json'),
-        ' — die im Projekt liegt und hier einmal importiert wird. Danach bleibt sie gespeichert.'
+        h('code', {}, 'katalog.json'),
+        ' — die im privaten Daten-Repo liegt und hier einmal geholt wird. Danach bleibt sie gespeichert.'
       ),
       h(
         'ol',
         { class: 'schritte' },
-        h('li', {}, 'Die Datei ', h('code', {}, 'katalog.json'), ' in iCloud Drive legen (oder per AirDrop/Mail schicken).'),
-        h('li', {}, 'Hier auf „Katalog auswählen" tippen und die Datei aussuchen.'),
+        h('li', {}, 'Auf „Aus GitHub holen" tippen — dafür müssen Repo und Token unter „Katalog" hinterlegt sein.'),
+        h('li', {}, 'Ohne Netz: die Datei in iCloud Drive legen (oder per AirDrop/Mail schicken) und unten auswählen.'),
         h('li', {}, 'Fertig. Reisen entstehen ab jetzt auf diesem Gerät.')
       ),
       h(
         'div',
         { class: 'knopf-reihe' },
-        dateiWaehler('.json,application/json', (d) => importiereKatalog(d, aktionen), 'Katalog auswählen …', 'knopf knopf-haupt')
+        h(
+          'button',
+          { class: 'knopf knopf-haupt', disabled: Boolean(laden), onclick: () => zieheKatalog(aktionen) },
+          'Aus GitHub holen'
+        ),
+        dateiWaehler('.json,application/json', (d) => importiereKatalog(d, aktionen), 'Katalog auswählen …')
       ),
       h(
         'p',
         { class: 'klein' },
-        'Der Katalog wird beim Import geprüft. Passt die Datei nicht, wird nichts übernommen.'
+        'Der Katalog wird vor dem Übernehmen geprüft. Passt er nicht, wird nichts übernommen.'
       )
     )
   );

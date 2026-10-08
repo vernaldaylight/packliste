@@ -4,8 +4,8 @@
  * Diese Ansicht ist die einzige, die auch ohne Katalog funktioniert — sie ist
  * der Weg zurück, wenn iOS den Script-Storage geräumt hat (PRD §4.5).
  *
- * Der Katalog ist am Handy read-only: geändert wird er am Mac in
- * `daten/katalog.json` und per Commit (PRD §3.6).
+ * Der Katalog ist am Handy read-only: geändert wird er am Mac im Daten-Repo und
+ * per Commit (PRD §3.6). Die Sync-Handgriffe liegen in `syncUi.js`.
  */
 
 import { h, karte, dateiWaehler } from './dom.js';
@@ -19,17 +19,24 @@ import {
 } from '../store.js';
 import { importiereKatalog, importiereReisen, katalogDateiname, reisenDateiname } from './dateien.js';
 import { KATEGORIEN } from '../engine.js';
+import { karteSync, karteKonflikt, zieheKatalog, zieheReisen, schiebeReisenStand } from './syncUi.js';
 
-export function ansichtKatalog({ katalog, daten, aktionen }) {
-  if (!katalog) return ohneKatalog(aktionen);
+export function ansichtKatalog(zustand) {
+  const { katalog, daten, aktionen, konflikt, laden } = zustand;
+  if (!katalog) return ohneKatalog(zustand);
 
   const s = katalogStatistik(katalog);
   const gepflegt = s.regeln.fest + s.regeln.pro_tage;
+  // `laden` ist das Flag aus dem Zustand, NICHT `aktionen.lade` — das ist die
+  // Methode. Wer hier die Methode prüft, sperrt nie einen Knopf.
+  const laeuft = Boolean(laden);
 
   return h(
     'div',
     { class: 'stapel' },
     h('h1', {}, 'Katalog & Daten'),
+
+    karteKonflikt({ konflikt, daten, aktionen, laden }),
 
     karte(
       'Katalog',
@@ -46,7 +53,7 @@ export function ansichtKatalog({ katalog, daten, aktionen }) {
         'p',
         { class: 'feld-hinweis' },
         `Katalog-Abdeckung: ${s.items === 0 ? 0 : Math.round((gepflegt / s.items) * 100)} % der Items haben eine gepflegte Mengenregel. ` +
-          'Der Rest steht auf „einmal" und wird am Mac in daten/katalog.json nachgezogen.'
+          'Der Rest steht auf „einmal" und wird am Mac im Daten-Repo nachgezogen.'
       ),
       h('h3', { class: 'unter-titel' }, 'Verteilung'),
       h(
@@ -57,6 +64,11 @@ export function ansichtKatalog({ katalog, daten, aktionen }) {
       h(
         'div',
         { class: 'knopf-reihe' },
+        h(
+          'button',
+          { class: 'knopf', disabled: laeuft, onclick: () => zieheKatalog(aktionen) },
+          'Aus GitHub holen'
+        ),
         dateiWaehler('.json,application/json', (d) => importiereKatalog(d, aktionen), 'Anderen Katalog importieren …'),
         h('button', { class: 'knopf', onclick: () => exportiereKatalog(katalog, aktionen) }, 'Katalog sichern'),
         h(
@@ -82,12 +94,11 @@ export function ansichtKatalog({ katalog, daten, aktionen }) {
     ),
 
     karte(
-      'Reisen sichern (US-10)',
+      'Reisen (US-10)',
       h(
         'p',
         {},
-        `${daten.reisen.length} Reisen, ${daten.packlisten.length} Packlisten liegen nur in diesem Browser. ` +
-          'Ein Export legt sie als Datei in iCloud Drive, AirDrop oder Mail ab.'
+        `${daten.reisen.length} Reisen, ${daten.packlisten.length} Packlisten. Sie liegen in diesem Browser und — wenn du schiebst — im privaten Daten-Repo.`
       ),
       h(
         'div',
@@ -96,6 +107,33 @@ export function ansichtKatalog({ katalog, daten, aktionen }) {
           'button',
           {
             class: 'knopf knopf-haupt',
+            disabled: daten.reisen.length === 0 || laeuft,
+            onclick: () => schiebeReisenStand(aktionen, daten),
+          },
+          'Hochschieben'
+        ),
+        h(
+          'button',
+          { class: 'knopf', disabled: laeuft, onclick: () => zieheReisen(aktionen, daten) },
+          'Holen'
+        )
+      ),
+      h(
+        'p',
+        { class: 'feld-hinweis' },
+        '„Hochschieben" legt den hiesigen Stand drüben ab und ersetzt, was dort liegt — liegt dort eine Reise, die es hier nicht gibt, wird vorher gefragt. ' +
+          '„Holen" führt zusammen: gleiche Reise wird ersetzt, neue kommen dazu, hiesige bleiben.'
+      ),
+
+      h('h3', { class: 'unter-titel' }, 'Ohne Netz: Datei'),
+      h('p', { class: 'klein' }, 'Beide Wege bleiben — der Sync braucht Netz, die Datei nicht.'),
+      h(
+        'div',
+        { class: 'knopf-reihe' },
+        h(
+          'button',
+          {
+            class: 'knopf',
             disabled: daten.reisen.length === 0,
             onclick: async () => {
               const ergebnis = await teileDatei(JSON.stringify({ ...daten, exportiert_am: new Date().toISOString() }, null, 2), reisenDateiname(), 'Packliste — Reisen');
@@ -139,19 +177,21 @@ export function ansichtKatalog({ katalog, daten, aktionen }) {
         : null
     ),
 
+    karteSync({ aktionen, laden }),
+
     karte(
       'Wo der Katalog herkommt',
       h(
         'p',
         {},
-        'Der Katalog ist eine Datei im Projekt (',
-        h('code', {}, 'daten/katalog.json'),
-        '). Er wird nicht mit der App ausgeliefert — die Deploy-URL enthält nur die App-Hülle und nichts Persönliches (O11).'
+        'Der Master liegt im privaten Daten-Repo, zusammen mit den Reisen. Von dort holt ihn „Aus GitHub holen". ' +
+          'Ins App-Repo und in die Deploy-URL kommt er nicht — dort liegt nur die App-Hülle und nichts Persönliches (O11).'
       ),
       h(
         'p',
         { class: 'feld-hinweis' },
-        'Katalogänderungen laufen am Mac: katalog.json bearbeiten, committen, aufs Handy legen, hier neu importieren. Am Handy ist der Katalog bewusst read-only.'
+        'Katalogänderungen laufen am Mac: im Daten-Repo katalog.json bearbeiten und committen, dann hier „Aus GitHub holen". ' +
+          'Ohne Token geht es weiter per Datei — „Anderen Katalog importieren". Am Handy ist der Katalog bewusst read-only.'
       )
     )
   );
@@ -172,7 +212,7 @@ async function exportiereKatalog(katalog, aktionen) {
 }
 
 /** Ohne Katalog — der Rückweg nach einer Räumung des Script-Storage. */
-function ohneKatalog(aktionen) {
+function ohneKatalog({ aktionen, laden }) {
   const gesichert = katalogBackupVorhanden();
   return h(
     'div',
@@ -183,14 +223,19 @@ function ohneKatalog(aktionen) {
       h(
         'p',
         {},
-        'Importiere ',
+        'Hol ',
         h('code', {}, 'katalog.json'),
-        ' aus dem Projekt. Der Master liegt im git, es geht also nichts verloren — es ist nur ein Handgriff.'
+        ' aus dem privaten Daten-Repo. Der Master liegt im git, es geht also nichts verloren — es ist nur ein Handgriff.'
       ),
       h(
         'div',
         { class: 'knopf-reihe' },
-        dateiWaehler('.json,application/json', (d) => importiereKatalog(d, aktionen), 'Katalog auswählen …', 'knopf knopf-haupt'),
+        h(
+          'button',
+          { class: 'knopf knopf-haupt', disabled: Boolean(laden), onclick: () => zieheKatalog(aktionen) },
+          'Aus GitHub holen'
+        ),
+        dateiWaehler('.json,application/json', (d) => importiereKatalog(d, aktionen), 'Katalog auswählen …'),
         gesichert
           ? h(
               'button',
@@ -210,7 +255,12 @@ function ohneKatalog(aktionen) {
             )
           : null
       ),
-      h('p', { class: 'feld-hinweis' }, 'Reisen und Packlisten sind davon nicht betroffen.')
-    )
+      h(
+        'p',
+        { class: 'feld-hinweis' },
+        'Ohne Netz geht nur die Datei. Reisen und Packlisten sind von alldem nicht betroffen.'
+      )
+    ),
+    karteSync({ aktionen })
   );
 }

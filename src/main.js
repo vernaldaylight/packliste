@@ -26,6 +26,14 @@ const zustand = {
   daten: null,
   /** Einmalige Rückmeldung, die die nächste Ansicht oben anzeigt. */
   blitz: null,
+  /**
+   * Der Text, der gerade läuft — oder `null`. Genau ein Sync zur Zeit: ein
+   * zweiter Knopfdruck während eines laufenden Vorgangs soll nicht zwei
+   * Schreibvorgänge lostreten.
+   */
+  laden: null,
+  /** Ein ungelöster Sync-Konflikt. Belegt die Konfliktkarte (PRD §4.5). */
+  konflikt: null,
 };
 
 /* --- Zustandshelfer -------------------------------------------------------- */
@@ -57,6 +65,33 @@ const aktionen = {
   /** Eine Liste von Validierungsfehlern als Rückmeldung (US-09). */
   zeigeFehler(fehler, titel) {
     zustand.blitz = { fehler, titel };
+  },
+
+  /**
+   * Führt einen Sync-Handgriff aus und hält die Oberfläche so lange an.
+   *
+   * Während `laden` gesetzt ist, sind die Sync-Knöpfe `disabled` — das ist der
+   * ganze Ladezustand. Die Aufgabe setzt nur `melde`/`zeigeFehler`; gerendert
+   * wird genau einmal am Ende, damit die Rückmeldung nicht vorher verpufft.
+   */
+  async lade(text, aufgabe) {
+    if (zustand.laden) return null;
+    zustand.laden = text;
+    render();
+    try {
+      return await aufgabe();
+    } finally {
+      zustand.laden = null;
+      render();
+    }
+  },
+
+  setzeKonflikt(konflikt) {
+    zustand.konflikt = konflikt;
+  },
+
+  verwerfeKonflikt() {
+    zustand.konflikt = null;
   },
 
   /* Reisen */
@@ -162,6 +197,7 @@ function render() {
 
   leere(wurzel);
   wurzel.append(kopfzeile());
+  if (zustand.laden) wurzel.append(meldung(zustand.laden, 'info'));
   if (blitz?.fehler) {
     if (blitz.titel) wurzel.append(meldung(blitz.titel, 'fehler'));
     wurzel.append(fehlerListe(blitz.fehler));

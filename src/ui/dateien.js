@@ -9,7 +9,7 @@
  * Import lässt den bestehenden Bestand unangetastet (US-09).
  */
 
-import { leseJsonDatei, validiereKatalog, speichereKatalog, validiereDaten, zeitstempel } from '../store.js';
+import { leseJsonDatei, validiereKatalog, speichereKatalog, validiereDaten, fuegeReisenZusammen, zeitstempel } from '../store.js';
 
 /** Prüft und übernimmt eine Katalog-Datei. */
 export async function importiereKatalog(datei, aktionen) {
@@ -65,25 +65,10 @@ export async function importiereReisen(datei, aktionen, ersetzen) {
     aktionen.setzeDaten({ version: 1, reisen: geprueft.daten.reisen, packlisten: geprueft.daten.packlisten });
     aktionen.melde(`${neu} Reisen wiederhergestellt.`, 'ok');
   } else {
-    // Zusammenführen ohne Merge-Logik (PRD §3.4): gleiche id wird ersetzt,
-    // alles andere angehängt. Reisen entstehen nur am Handy, echte Konflikte
-    // gibt es deshalb nicht.
-    const vorhanden = aktionen.daten.reisen.slice();
-    const nachId = new Map(vorhanden.map((r) => [r.id, r]));
-    let dazu = 0;
-    for (const r of geprueft.daten.reisen) {
-      if (!nachId.has(r.id)) dazu++;
-      nachId.set(r.id, r);
-    }
-    const listeIds = new Set(geprueft.daten.packlisten.map((p) => p.reise_id));
-    aktionen.setzeDaten({
-      version: 1,
-      reisen: [...nachId.values()],
-      packlisten: [
-        ...aktionen.daten.packlisten.filter((p) => !listeIds.has(p.reise_id)),
-        ...geprueft.daten.packlisten,
-      ],
-    });
+    // Zusammenführen über die `id` — dieselbe Regel wie beim Sync (PRD §3.4,
+    // §4.5), deshalb liegt sie in store.js und nicht hier.
+    const { daten, dazu } = fuegeReisenZusammen(aktionen.daten, geprueft.daten);
+    aktionen.setzeDaten(daten);
     aktionen.melde(`${neu} Reisen gelesen, davon ${dazu} neu.`, 'ok');
   }
   aktionen.render();

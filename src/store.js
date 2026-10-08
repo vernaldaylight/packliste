@@ -20,6 +20,10 @@ export const SCHLUESSEL = {
   daten: 'packliste.reisen',
   backupKatalog: 'packliste.katalog.backup',
   backupDaten: 'packliste.reisen.backup',
+  // Synchronisierung (PRD §4.5). Getrennt in Einstellung und Zustand, damit
+  // sich das Token löschen lässt, ohne das Repo zu vergessen.
+  sync: 'packliste.sync',
+  syncStand: 'packliste.sync.stand',
 };
 
 const DATEN_VERSION = 1;
@@ -266,6 +270,44 @@ export function validiereDaten(rohdaten) {
   };
 }
 
+/**
+ * Führt zwei Bestände über die `id` zusammen — die Logik aus dem Datei-Import
+ * (US-10), jetzt auch für den Sync (PRD §4.5) statt zweimal daneben.
+ *
+ * Bewusst **keine** Feld-Merge-Regel und kein Zeitstempel im Datenmodell:
+ * gleiche `id` wird ersetzt, alles andere angehängt. Reisen entstehen nur am
+ * Handy (Stufe A, PRD §3.4) — es gibt also keinen Fall, in dem zwei Fassungen
+ * derselben Reise feldweise zu mischen wären. Ob drüben inzwischen etwas anderes
+ * liegt, erkennt der Sync über die `sha` der Contents-API, nicht über die Daten.
+ *
+ * Eine Packliste gehört zu genau einer Reise und wird als Ganzes ersetzt, nicht
+ * positionenweise gemischt — sonst verlöre man beim Holen den Abhak-Stand.
+ * Kommt eine Reise ohne Packliste herein, bleibt die hiesige erhalten.
+ *
+ * @returns {{daten: object, dazu: number}} `dazu` = Zahl der neuen Reisen
+ */
+export function fuegeReisenZusammen(bestand, neu) {
+  const nachId = new Map((bestand?.reisen ?? []).map((r) => [r.id, r]));
+
+  let dazu = 0;
+  for (const r of neu?.reisen ?? []) {
+    if (!nachId.has(r.id)) dazu++;
+    nachId.set(r.id, r);
+  }
+
+  const ersetzteListeIds = new Set((neu?.packlisten ?? []).map((p) => p.reise_id));
+  const behalteneListen = (bestand?.packlisten ?? []).filter((p) => !ersetzteListeIds.has(p.reise_id));
+
+  return {
+    daten: {
+      version: DATEN_VERSION,
+      reisen: [...nachId.values()],
+      packlisten: [...behalteneListen, ...(neu?.packlisten ?? [])],
+    },
+    dazu,
+  };
+}
+
 /* --- Dateien: rein und raus (US-09, US-10) --------------------------------- */
 
 /** Liest eine vom Nutzer ausgewählte Datei als JSON. */
@@ -339,6 +381,97 @@ export async function inZwischenablage(text) {
       return false;
     }
   }
+}
+
+/* --- Synchronisierung (PRD §4.5) ------------------------------------------- */
+
+/**
+ * Die Einstellung des Sync: Repo und Token.
+ *
+ * Das Token liegt ausschließlich hier — nie im Code, nie im Build, nie in einer
+ * Meldung. Wer das Gerät in die Hand bekommt oder den Storage ausliest, kommt
+ * daran; deshalb ist es ein fein granuliertes PAT, das auf genau ein privates
+ * Repo beschränkt ist und sich widerrufen lässt (PRD §11).
+ *
+ * @returns {{repo: string, token: string}}
+ */
+export function ladeSync() {
+  const roh = lies(SCHLUESSEL.sync);
+  if (!roh) return { repo: '', token: '' };
+  try {
+    const s = JSON.parse(roh);
+    return {
+      repo: typeof s?.repo === 'string' ? s.repo : '',
+      token: typeof s?.token === 'string' ? s.token : '',
+    };
+  } catch {
+    return { repo: '', token: '' };
+  }
+}
+
+/**
+ * Schreibt die Einstellung. Ein fehlendes `token` (undefined) lässt das
+ * hinterlegte stehen — sonst würde ein reines Repo-Speichern das Token löschen.
+ *
+ * Weil der gemerkte `sha` zu einem Repo gehört, wird er hier verworfen: nach
+ * einem Repo-Wechsel wäre er falsch und ein gewöhnlicher Push sähe wie ein
+ * Konflikt aus.
+ */
+export function speichereSync({ repo, token }) {
+  const alt = ladeSync();
+  const neu = {
+    repo: String(repo ?? '').trim(),
+    token: token === undefined ? alt.token : String(token ?? '').trim(),
+  };
+  const ok = schreib(SCHLUESSEL.sync, JSON.stringify(neu));
+  if (ok) {
+    try {
+      localStorage.removeItem(SCHLUESSEL.syncStand);
+    } catch {
+      /* egal */
+    }
+  }
+  return ok;
+}
+
+/** Löscht nur das Token; das Repo bleibt, damit es nicht neu getippt werden muss. */
+export function loescheToken() {
+  const { repo } = ladeSync();
+  return speichereSync({ repo, token: '' });
+}
+
+export function tokenHinterlegt() {
+  return ladeSync().token.length > 0;
+}
+
+/**
+ * Der zuletzt gesehene `sha` je Datensatz — die Konfliktbremse (PRD §4.5).
+ * `art` ist 'katalog' oder 'reisen'.
+ *
+ * Geht verloren, wenn iOS den Storage räumt (§4.5). Dann holt der Sync die
+ * `sha` vor dem Schreiben per GET nach — sonst antwortet die API mit 422 statt
+ * mit einem erkennbaren Konflikt.
+ */
+export function ladeSyncStand(art) {
+  const roh = lies(SCHLUESSEL.syncStand);
+  if (!roh) return null;
+  try {
+    const stand = JSON.parse(roh)?.[art];
+    return stand && typeof stand.sha === 'string' ? stand : null;
+  } catch {
+    return null;
+  }
+}
+
+export function speichereSyncStand(art, stand) {
+  let bisher = {};
+  try {
+    bisher = JSON.parse(lies(SCHLUESSEL.syncStand) ?? '{}') ?? {};
+  } catch {
+    bisher = {};
+  }
+  bisher[art] = { sha: String(stand?.sha ?? ''), zeit: stand?.zeit ?? new Date().toISOString() };
+  return schreib(SCHLUESSEL.syncStand, JSON.stringify(bisher));
 }
 
 /* --- Kleinkram ------------------------------------------------------------- */

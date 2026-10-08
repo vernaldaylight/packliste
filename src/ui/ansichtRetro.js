@@ -7,7 +7,7 @@
  *
  * Damit dieser Commit leichtfällt, stehen die Tags der Reise hier als
  * kopierbare Zeile bereit: genau die Tags, die das neue Item in
- * daten/katalog.json tragen muss, damit es künftig ausgewählt wird.
+ * katalog.json des Daten-Repos tragen muss, damit es künftig ausgewählt wird.
  */
 
 import { h, karte, meldung } from './dom.js';
@@ -73,9 +73,9 @@ export function ansichtRetro({ daten, aktionen, reiseId }) {
       h(
         'p',
         {},
-        'Im MVP läuft das über das Repo: ',
-        h('code', {}, 'daten/katalog.json'),
-        ' bearbeiten, committen, am Handy neu importieren. Der Editor dafür kommt mit FF-16.'
+        'Im MVP läuft das über das Daten-Repo: ',
+        h('code', {}, 'katalog.json'),
+        ' bearbeiten, committen, am Handy unter „Katalog" neu holen. Der Editor dafür kommt mit FF-16.'
       ),
       h('p', { class: 'feld-hinweis' }, 'Die Tags dieser Reise, damit das neue Item künftig ausgewählt wird:'),
       h('p', { class: 'tag-reihe' }, ...tags.map((t) => h('span', { class: 'chip chip-ruhig' }, t))),
