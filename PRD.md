@@ -1,9 +1,9 @@
 # Packliste — Product Requirements Document
 
-**Version**: 1.1
+**Version**: 1.2
 **Datum**: 2026-10-07
 **Autor**: Sarah
-**Status**: Abgestimmt — bereit für die Umsetzung
+**Status**: Abgestimmt — bereit für die Umsetzung. Technische Architektur entschieden (§3.6). Der Katalog-Editor ist aus dem MVP in die erste Überarbeitung verschoben (FF-16).
 **Sprache der App**: Deutsch
 
 ---
@@ -28,8 +28,12 @@ Eine Web-App, die aus einem festen Item-Katalog und einem beschriebenen Reise-Pr
 4. Manuelle Nachträge pro Reise: **sinkend** über die Zeit (Katalog lernt)
 
 ### Umfang & Ressourcen
-- Solo-Projekt, Web-Frontend, kein Backend, keine Datenbank
-- Persistenz: zwei lokale JSON-Dateien (`katalog.json`, `reisen.json`)
+- Solo-Projekt, reine Browser-App, kein Backend-Prozess, keine Datenbank
+- Auslieferung: statisch gehostet, damit die Liste auch am Handy verfügbar ist (§3.6)
+- Stack: Vite + Vanilla JS
+- Persistenz: `katalog.json` als versionierte Datei im Repo (**nicht deployt**), am Handy per Button importiert; Reisen im `localStorage` des Handys (§4.5)
+- Datentransfer Mac ⇄ Handy: per Button über Dateien (iCloud Drive, AirDrop, Mail) — keine automatische Synchronisierung
+- Das Deployment enthält nur die App-Hülle, keine persönlichen Daten
 - Herkunft: Praxisprojekt im Agentic-Coding-Kurs, danach dauerhafte private Nutzung
 
 ---
@@ -113,6 +117,10 @@ Für unbekannte Aktivitäten lässt sich ein neuer Tag frei eintippen — die Ap
 | F10 | Liste als Text/Markdown exportieren | P1 |
 | F11 | Reise speichern und später wieder öffnen | P1 |
 | F12 | Nach-der-Reise-Retro: "Was hat gefehlt?" | P1 |
+| F13 | Katalog per Datei in die App importieren (US-09) | P0 |
+| F14 | Reise-Daten per Button als Datei exportieren (US-10) | P0 |
+
+**Pflegeweg im MVP**: Der Katalog wird **nicht** über eine UI bearbeitet, sondern über das Repo — Import-Skript für den Erstaufbau, danach gezielte Änderungen an `daten/katalog.json` (§3.6). Der Grund ist die Größe: 333 Items, deren Mengenregeln nach dem Import fast alle noch auf `einmal` stehen. Diese Arbeit ist Bulk-Arbeit und gehört in ein Skript, nicht in hunderte Klicks. Das Ventil für Einzelfälle bleibt US-05 (Overrides pro Reise).
 
 ### 3.4 Out of Scope (MVP)
 
@@ -121,13 +129,61 @@ Für unbekannte Aktivitäten lässt sich ein neuer Tag frei eintippen — die Ap
 - **Vorschlagen von Items, die man noch nicht im Katalog hat** ("besitzt du eine Tauchmaske?")
 - **Tag-Verwaltung** (umbenennen, zusammenführen, löschen über viele Items)
 - **Wetter-API, Gewichts-/Gepäcklimits, Packen nach Tasche, Sharing, PWA/Offline**
-- **Benutzerkonten, Server, Datenbank, Deployment**
+- **Benutzerkonten, Server-Prozess, Datenbank** — das Hosting ist statisch (§3.6), kein laufender Dienst
+- **Katalog-Editor in der UI** — Item-CRUD, Mengenregel-Editor mit Live-Vorschau (FR3) und Tag-Verwaltung kommen in der ersten Überarbeitung nach dem MVP (FF-16)
+- **Automatische Synchronisierung zwischen den Geräten** — im MVP läuft der Datentransfer per Button über Dateien (§4.5). Es gibt **keine Merge-Logik**, weil es nichts zu mischen gibt: Reisen entstehen nur am Handy (Stufe A)
+- **Reisen in beide Richtungen** (Stufe B) und **Katalogänderungen vom Handy** (Stufe C) — beides erst mit FF-16
+- **Katalog im Deployment** — der Build enthält nur die App-Hülle (§3.6)
 
 ### 3.5 MVP-Definition
 
-**Kernumfang**: alle P0-Features — F1–F9.
+**Kernumfang**: alle P0-Features — F1–F9, dazu die neuen F13 (Katalog-Import) und F14 (Daten-Export).
 **Fertig, wenn**: Eine echte vergangene Reise im Formular eingegeben wird und die generierte Liste ohne manuelles Hinzufügen fehlender Kern-Items zum Packen taugt.
 **Lernziele**: Trägt das Zwei-Achsen-Modell wirklich? Sind die Mengenregeln ausdrucksstark genug? Wie viel Nacharbeit bleibt realistisch?
+
+### 3.6 Technische Architektur
+
+**Entschieden am 2026-10-07, Datentransfer nachgeschärft am 2026-10-08.** Leitfrage war: Braucht diese App ein Backend? Nein — und diese Antwort bestimmt jede weitere Entscheidung.
+
+Die App hat genau zwei Aufgaben, die man auslagern *könnte*: **Persistenz** und die **Regel-Engine**. Die Engine ist eine reine Funktion über den Katalog (Tag-Schnittmenge plus Mengenformel) und rechnet bei 333 Items in unter einer Millisekunde — sie gehört in den Browser. Für die Persistenz braucht es keine Transaktionen, keine Mehrbenutzer und keine Geheimnisse. Damit fällt jeder Server-Anteil weg: ein getrenntes Frontend/Backend oder ein Python-Backend würde nur einen zweiten Prozess hinzufügen, den man starten muss, bevor die App funktioniert — für null Gegenwert.
+
+| Baustein | Entscheidung | Begründung |
+|---|---|---|
+| Auslieferung | Statisch gehostet (**Vercel**), kein Backend-Prozess | Reine Browser-App. Vercel erkennt Vite und liefert `dist/` aus — kostenlos, HTTPS, URL fürs Handy. Kein Laptop muss dafür laufen |
+| Build | **Vite** | Dev-Server mit Hot-Reload plus Bundler, ohne Framework-Zwang |
+| UI | **Vanilla JS** | Die Engine ist eine reine Funktion, der Rest ist Formular- und Listen-Handling über fünf Ansichten. Ein UI-Framework wäre hier Ballast |
+| **Inhalt des Deployments** | **Nur die App-Hülle** — kein Katalog, keine Reisen | Die Deploy-URL ist damit öffentlich und trotzdem unbedenklich: sie enthält nichts Persönliches (O11) |
+| Katalog-Transport | **Datei per Button**: `katalog.json` wird am Handy über die Dateiauswahl aus iCloud Drive importiert | iOS-Safari hat **keine** File System Access API — ein Schreibweg in iCloud existiert dort nicht. Die Dateiauswahl zeigt iCloud Drive direkt |
+| Datenspeicherung am Handy | **`localStorage`** für Katalog **und** Reisen | Eine Speicherquelle, ein Importweg. Der Katalog wird beim ersten Start einmal importiert |
+| Datenrückweg | **Share-Sheet** (`navigator.share`) → iCloud Drive, AirDrop oder Mail | Der Export ist bewusst nicht iCloud-spezifisch — alle Ziele liegen im selben Menü. Am Mac landet die Datei im Repo, dann Commit |
+| Katalog-Pflege | **Repo + Import-Skript**, keine UI im MVP | Bulk-Arbeit an 333 Items gehört in Skript und git, nicht in Klicks (§3.3) |
+| Offline | Nicht im MVP | Ohne Service Worker braucht die Seite Netz. Der Markdown-Export (F10) ist der Offline-Pfad; PWA bleibt FF-12 |
+
+**Warum Python trotzdem vorkommt — aber nicht als Backend.** Der einzige Ort, an dem Python hier glänzt, ist der **Excel-Import** (§6): Semikolon als Trennzeichen, UTF-8-Umlaute, Formel-Spalten mit doppelten Spaltennamen. Das ist ein **einmaliges Migrationsskript** `quellen/ → daten/katalog.json`, kein laufender Dienst.
+
+**Projektstruktur**
+
+```
+packliste/
+├─ index.html
+├─ src/
+│  ├─ main.js        App-Start — Katalog da? sonst Import-Aufforderung
+│  ├─ engine.js      Regel-Engine + Mengenformel — reine Funktionen, testbar ohne DOM
+│  ├─ store.js       localStorage lesen/schreiben, Datei-Import, Backup, Share-Export
+│  └─ ui/            die Ansichten
+├─ daten/
+│  └─ katalog.json   der Schatz — im git, NICHT deployt (§4.5)
+└─ scripts/
+   └─ import-csv.py  einmalig: quellen/ → daten/katalog.json
+```
+
+**`daten/` liegt bewusst außerhalb von `public/`**: Alles unter `public/` kopiert Vite unverändert in den Build. Läge der Katalog dort, wäre er über die Deploy-URL abrufbar — genau das, was die Entscheidung gegen Weg 1 ausschließt.
+
+**Wo die App im MVP läuft**: Weil Reisen am Handy entstehen (Stufe A), ist die Browser-App im MVP **praktisch ein Handy-Werkzeug**. Am Mac passiert in dieser Zeit: Import-Skript starten, `daten/katalog.json` bearbeiten, committen. Die File System Access API — der Schreibweg aus 1.2 — wird erst mit dem Katalog-Editor (FF-16) gebraucht und kommt im MVP nicht vor.
+
+**Konsequenz für die Pflege**: Katalogänderungen laufen über `daten/katalog.json` und einen Commit. Damit sie am Handy ankommen, muss die Datei neu importiert werden (§4.5). Am Handy ist der Katalog **read-only**.
+
+**Verworfene Alternativen** stehen in Anhang C.
 
 ---
 
@@ -207,28 +263,42 @@ Packliste {
 
 ### 4.5 Persistenz
 
-Kein Server, keine DB, keine Konten. **Zwei lokale JSON-Dateien** statt einer:
+Kein Server-Prozess, keine DB, keine Konten. Die Trennung nach Wert bleibt — sie zeigt sich in **zwei Datensätzen mit sehr verschiedenem Lebenslauf**:
 
-| Datei | Inhalt | Charakter |
-|---|---|---|
-| `katalog.json` | `items` | **Der Schatz.** Stunden Handarbeit, nicht regenerierbar |
-| `reisen.json` | `reisen`, `packlisten` | Wegwerfbar, jederzeit neu erzeugbar |
+| Datensatz | Inhalt | Master liegt | Am Handy |
+|---|---|---|---|
+| `katalog.json` | `items` | **Datei im Repo** (`daten/`) | `localStorage`, einmal per Button importiert |
+| Reisen + Packlisten | `reisen`, `packlisten` | **`localStorage` am Handy** | dasselbe — es gibt keinen zweiten Ort |
 
 ```json
-// katalog.json
+// daten/katalog.json  — im git, NICHT deployt
 { "version": 1, "items": [ ... ] }
 
-// reisen.json
+// localStorage["packliste.reisen"]  — am Handy, nirgends sonst
 { "version": 1, "reisen": [ ... ], "packlisten": [ ... ] }
 ```
 
-**Warum getrennt und nicht eine Datei**: Der Katalog ist der einzige Teil, dessen Verlust echte Arbeit kostet. Reisen und Packlisten sind Ableitungen. Getrennt gespeichert kann ein schiefgelaufener Schreibvorgang auf einer Packliste den Katalog nicht beschädigen.
+**Warum getrennt**: Der Katalog ist der einzige Teil, dessen Verlust echte Arbeit kostet. Reisen und Packlisten sind Ableitungen. Getrennt gehalten kann ein schiefgelaufener Schreibvorgang auf einer Packliste den Katalog nicht beschädigen.
+
+**Die Richtungen, in denen Daten fließen** — im MVP bewusst asymmetrisch:
+
+| Richtung | Was | Wie |
+|---|---|---|
+| Mac → Handy | `katalog.json` | Datei in iCloud Drive legen, am Handy über den Import-Button holen |
+| Handy → Mac | Reisen, als Backup | Share-Sheet → iCloud Drive oder AirDrop. **Ersetzt nichts, sichert nur** |
+
+**Es gibt keine automatische Synchronisierung und keine Merge-Regel.** Weil Reisen ausschließlich am Handy entstehen (Stufe A, §3.4), existiert nie eine Reise in zwei Versionen. Genau diese Vereinfachung trägt den MVP — und ist der Grund, warum kein Server gebraucht wird.
+
+**Der Preis — bewusst akzeptiert**:
+
+- **Der Katalog am Handy kann verschwinden.** iOS räumt Script-Storage von Websites, die 7 Tage nicht geöffnet wurden. Dann fehlt der Katalog und die App zeigt die Import-Aufforderung. **Kein Datenverlust** — der Master liegt im git — aber ein erneuter Import per Button.
+- **Der Katalog ist am Handy read-only.** Geändert wird er am Mac im Editor und per Commit.
 
 Zwei Nebeneffekte, die den Aufwand sofort rechtfertigen:
 - `katalog.json` kommt **unter Versionskontrolle** (git). Die Historie ist lesbar (Zeilen-Diffs pro Item), Backups kosten nichts, und ein Fehlgriff lässt sich mit `git checkout` zurücknehmen.
-- Getrennte Kataloge pro Person (FF-04) brauchen später nur eine weitere `katalog-<person>.json` — die Reise-Datei bleibt unberührt.
+- Getrennte Kataloge pro Person (FF-04) brauchen später nur eine weitere `katalog-<person>.json` — die Reise-Daten bleiben unberührt.
 
-Jede Datei trägt `version` für spätere Migrationen. Vor jedem Schreiben wird die Vorgängerversion als Backup gesichert.
+Jede Struktur trägt `version` für spätere Migrationen. Vor jedem Schreiben wird die Vorgängerversion als Backup gesichert.
 
 ---
 
@@ -326,8 +396,10 @@ Der Import endet mit einer Zusammenfassung: Anzahl importierter Items, Konflikte
 
 ## 7. User Stories
 
-### US-01 — Katalog pflegen
+### US-01 — Katalog pflegen *(nicht im MVP — erste Überarbeitung, siehe FF-16)*
 > Als Nutzerin möchte ich Items mit Kategorie, Tags und Mengenregel anlegen und bearbeiten, damit mein Bestand die Wahrheit über meine Dinge ist.
+
+> **Im MVP ersetzt durch**: Pflege über das Repo — Import-Skript beim Erstaufbau, danach gezielte Änderungen an `daten/katalog.json` (§3.3, §3.6). Die Akzeptanzkriterien unten beschreiben das Zielbild der ersten Überarbeitung.
 
 **Akzeptanzkriterien**
 - [ ] Item anlegen mit Name, genau einer Kategorie, beliebig vielen Tags
@@ -390,8 +462,29 @@ Der Import endet mit einer Zusammenfassung: Anzahl importierter Items, Konflikte
 - [ ] Gruppierung und Mengen bleiben erhalten
 - [ ] Nur ungepackte Positionen exportierbar
 
-### US-08 — Retrospektive
+### US-08 — Retrospektive *(im MVP nur das Freitextfeld)*
 > Als Nutzerin möchte ich nach der Reise festhalten, was gefehlt hat, damit die Liste beim nächsten Mal besser ist.
+
+> **Eingeschränkt im MVP**: Das Freitextfeld bleibt. „Aus einem Eintrag direkt ein Item anlegen" setzt einen schreibenden Katalog-Editor voraus und wandert mit FF-16 — im MVP wird das Item per Repo-Commit angelegt (die Tags der Reise stehen im Retro-Eintrag dafür bereit).
+
+### US-09 — Katalog aufs Handy holen
+> Als Nutzerin möchte ich meinen Katalog mit einem Button vom Mac aufs Handy bringen, damit die App unterwegs weiß, was ich besitze.
+
+**Akzeptanzkriterien**
+- [ ] Import-Button öffnet die Dateiauswahl; iCloud Drive ist direkt erreichbar
+- [ ] Die Datei wird geprüft (Format, `version`, Pflichtfelder) und erst dann übernommen
+- [ ] Bei ungültiger Datei: verständliche Meldung, **bestehender Katalog bleibt unangetastet**
+- [ ] Nach dem Import zeigt die App die Item-Anzahl und die Menge der importierten Regeln
+- [ ] Fehlt der Katalog (erster Start oder nach einer Räumung), zeigt die App eine Import-Aufforderung statt einer leeren Liste
+
+### US-10 — Daten sichern
+> Als Nutzerin möchte ich meine Reisen mit einem Button als Datei exportieren, damit meine Arbeit nicht nur im Browser eines Geräts liegt.
+
+**Akzeptanzkriterien**
+- [ ] Export-Button übergibt die Reise-Daten an das Teilen-Menü des Systems
+- [ ] iCloud Drive, AirDrop und Mail sind ohne Zusatzarbeit wählbar
+- [ ] Der Export ist eine gültige Datei, die US-09 wieder einlesen kann
+- [ ] Der Export verändert nichts am lokalen Bestand
 
 **Akzeptanzkriterien**
 - [ ] Freitextfeld "Was hat gefehlt?" an einer Reise
@@ -404,9 +497,9 @@ Der Import endet mit einer Zusammenfassung: Anzahl importierter Items, Konflikte
 
 | ID | Anforderung | Prio |
 |---|---|---|
-| FR1 | Items anlegen, lesen, bearbeiten, löschen | P0 |
+| FR1 | Items anlegen, lesen, bearbeiten, löschen | P0 — im MVP über `daten/katalog.json` (§3.6); UI-Editor folgt als FF-16 |
 | FR2 | Item hat genau eine Kategorie und beliebig viele Tags | P0 |
-| FR3 | Drei Mengenregel-Varianten mit Vorschau | P0 |
+| FR3 | Drei Mengenregel-Varianten; Editor-Vorschau „= 4 Stück für 10 Tage" | P0 — Varianten P0, Editor-Vorschau erst mit FF-16. Die *berechnete* Menge bleibt in der fertigen Liste sichtbar (FR7, FR8) |
 | FR4 | Reise-Formular mit automatischer Tag-Ableitung | P0 |
 | FR5 | Freitext-Tags im Formular anlegen | P0 |
 | FR6 | Regel-Engine mit Tag-Schnittmenge und Ausschluss | P0 |
@@ -414,12 +507,15 @@ Der Import endet mit einer Zusammenfassung: Anzahl importierter Items, Konflikte
 | FR8 | Gruppierte, abhakbare Ausgabe | P0 |
 | FR9 | Reise-lokale Overrides am Katalog vorbei | P0 |
 | FR10 | Excel/CSV-Import mit Report | P0 |
-| FR11 | Datenhaltung in lokaler JSON-Datei | P0 |
+| FR11 | Datenhaltung: Katalog im git als Datei, Laufzeitdaten im `localStorage` | P0 |
 | FR12 | Export als Markdown | P1 |
 | FR13 | Verkehrsmittel fließt als Tag in `tripTags` ein | P0 |
 | FR14 | Reise speichern, laden, duplizieren | P1 |
-| FR15 | Retro-Eintrag, der ein Item erzeugt | P1 |
-| FR16 | Item-Suche und Filter | P2 |
+| FR15 | Retro-Eintrag, der ein Item erzeugt | P1 — Item-Erzeugung setzt FF-16 voraus; im MVP nur das Freitextfeld (US-08) |
+| FR16 | Item-Suche und Filter | P2 — mit FF-16 |
+| FR17 | Katalog in die App importieren (Dateiauswahl, Validierung) | P0 |
+| FR18 | Reise-Daten als Datei exportieren (Share-Sheet) | P0 |
+| FR19 | Leerer-Zustand-Ansicht, die zum Import auffordert | P0 |
 
 ---
 
@@ -428,9 +524,9 @@ Der Import endet mit einer Zusammenfassung: Anzahl importierter Items, Konflikte
 | Bereich | Anforderung |
 |---|---|
 | Sprache | UI komplett Deutsch, keine Internationalisierung |
-| Plattform | Web-Frontend, moderner Browser; am Handy bedienbar |
-| Betrieb | Läuft lokal, kein Server, kein Login |
-| Datenschutz | Alle Daten bleiben lokal; keine Telemetrie, keine externen Aufrufe |
+| Plattform | Reine Browser-App; im MVP **am Handy** bedienbar (iOS Safari). Die Katalogpflege am Mac kommt erst mit FF-16 und braucht dort Chrome (File System Access API, §3.6) |
+| Betrieb | Statisch gehostet (§3.6), kein Server-Prozess, kein Login. Die App ist ohne laufenden Laptop nutzbar |
+| Datenschutz | Keine Telemetrie, keine externen Aufrufe; alle Daten bleiben auf dem Gerät. **Das Deployment enthält nur die App-Hülle** — kein Katalog, keine Reisen. Die Deploy-URL ist damit öffentlich und trotzdem unbedenklich (O11, entschieden) |
 | Performance | Listen-Erzeugung < 200 ms bei 500 Items |
 | Zuverlässigkeit | Backup der JSON vor jedem Schreiben; Export als Notausgang |
 | Bedienbarkeit | Am Handy einhändig bedienbar; Touch-Ziele ≥ 44 px |
@@ -472,10 +568,12 @@ Solo, Abendarbeit, parallel zum Kurs. Vier Wochen bis nutzbarer MVP.
 
 | Woche | Meilenstein | Ergebnis | Fertig, wenn |
 |---|---|---|---|
-| 1 | Datenmodell + Katalog | JSON-Schema, Item-CRUD, Persistenz | Items lassen sich anlegen und überleben einen Neustart |
-| 2 | Import + Reise-Formular | Excel-Import, Reise anlegen | Echter Bestand ist drin, Reise ist beschreibbar |
-| 3 | Engine + Ausgabe | Auswahllogik, Mengen, gruppierte Liste | Eine echte Reise erzeugt eine brauchbare Liste |
-| 4 | Feinschliff | Abhaken, Export, Retro, Overrides | Erste echte Reise wird damit gepackt |
+| 1 | Fundament + Katalog | Vite-Setup, JSON-Schema, `engine.js` mit Tests, `katalog.json` aus dem Import-Skript | Die Engine wählt aus 333 echten Items korrekt aus — testbar ohne eine einzige Ansicht |
+| 2 | Reise-Formular + Persistenz | Katalog-Import (US-09), Leerer-Zustand (FR19), Reise anlegen, Tag-Ableitung, `store.js` (localStorage, Backup, Share-Export), Deployment der App-Hülle | Eine Reise ist **am Handy** beschreibbar, überlebt einen Neustart und lässt sich als Datei sichern |
+| 3 | Ausgabe | Gruppierte Liste, Mengen sichtbar, Abhaken | Eine echte Reise erzeugt eine brauchbare Liste |
+| 4 | Feinschliff | Markdown-Export, Retro-Freitext, Overrides, Katalogpflege über Repo erproben | Erste echte Reise wird damit gepackt |
+
+**Verschiebung gegenüber 1.1**: Der Katalog-Editor fällt aus Woche 1 heraus (FF-16). Woche 1 wird dadurch nicht kleiner, sondern **risikoärmer** — die Engine ist eine reine Funktion und lässt sich gegen den echten Katalog testen, bevor eine einzige Ansicht existiert. Der Import rückt von Woche 2 auf Woche 1 vor, weil er den Katalog liefert, gegen den getestet wird.
 
 **Erster echter Einsatz**: Ende Woche 4. Das ist der Zeitpunkt, an dem sich zeigt, ob das Modell trägt.
 
@@ -485,8 +583,8 @@ Solo, Abendarbeit, parallel zum Kurs. Vier Wochen bis nutzbarer MVP.
 
 | # | Frage | Entscheidung |
 |---|---|---|
-| O1 | Eine JSON-Datei oder eine pro Entität? | ✅ **Zwei**: `katalog.json` (wertvoll) und `reisen.json` (regenerierbar). Siehe §4.5 |
-| O2 | Wie wird eine Mengenregel editiert? | ✅ **Gelöst.** Drei Radiobuttons, genau einer aktiv; bei `fest` und `pro_tage` werden die Zahlenfelder eingeblendet — **Rohfelder, kein Assistent.** Dazu Live-Vorschau „= 4 Stück für 10 Tage" |
+| O1 | Eine JSON-Datei oder eine pro Entität? | ✅ **Getrennt gehalten**, aber in zwei Medien: `katalog.json` als versionierte Datei (wertvoll), Reisen und Packlisten im `localStorage` (regenerierbar). Siehe §4.5 |
+| O2 | Wie wird eine Mengenregel editiert? | ✅ **Zielbild gelöst, aber nicht im MVP.** Drei Radiobuttons, genau einer aktiv; bei `fest` und `pro_tage` werden die Zahlenfelder eingeblendet — **Rohfelder, kein Assistent.** Dazu Live-Vorschau „= 4 Stück für 10 Tage". Im MVP wird die Regel direkt in `katalog.json` gesetzt; der Editor ist FF-16 |
 | O3 | Kann ein Item mehrere Kategorien haben? | ✅ **Nein, genau eine.** Diving-Gear bekommt die eigene Kategorie `Tauchausrüstung` |
 | O4 | Ausschluss-Tags schon im MVP? | ✅ **Feld jetzt, UI später** — wie in §5.3 |
 | O5 | Packliste als Snapshot oder live berechnet? | ✅ **Snapshot.** Sonst gehen Overrides (F6) und Häkchen (F5) bei jedem Render verloren |
@@ -495,14 +593,26 @@ Solo, Abendarbeit, parallel zum Kurs. Vier Wochen bis nutzbarer MVP.
 | O8 | Kategorien im Import aus Spalten oder Mapping-Tabelle? | Offen — technische Detailfrage, wird beim Import-Spike entschieden. Blockiert nichts |
 | O9 | Grundreihenfolge der Kategorien in der Ausgabe? | ✅ **Die Reihenfolge aus Anhang B.1**: Dokumente & Wertsachen zuerst, Sonstiges zuletzt |
 | O10 | Tags in der UI gruppiert darstellen? | ✅ **Ja, gruppiert** (Klima, Verkehr, Aktivität, Unterkunft). Gespeichert wird flach — die Gruppierung ist reine Darstellung und ändert das Datenmodell nicht |
+| O11 | Wie wird `katalog.json` vor fremdem Zugriff geschützt? | ✅ **Entschieden: Der Schutz erübrigt sich.** Der Katalog wird **nicht deployt** — der Build enthält nur die App-Hülle. Die Deploy-URL darf damit öffentlich sein, und es braucht weder Passwort noch Cloudflare Access. Der Katalog kommt per Import-Button aufs Handy (§4.5, US-09) |
 
-**Nur noch eine Frage ist wirklich offen** (O8), und sie ist technisch statt fachlich. Das fachliche Fundament steht.
+**Nur noch eine Frage ist wirklich offen** (O8), und sie ist technisch statt fachlich — sie wird beim Import-Spike entschieden und blockiert nichts. Das fachliche Fundament steht.
 
 ---
 
 ## 14. Future Features (bewusst nicht im MVP)
 
 Nach Wert für das Kernproblem geordnet — nicht nach Umsetzungsaufwand.
+
+### Erste Überarbeitung — direkt nach dem MVP
+
+**FF-16 · Katalog-Editor in der UI** *(aus dem MVP verschoben — siehe US-01, FR1, FR3, FR15)*
+Item-CRUD, Mengenregel-Editor mit Live-Vorschau (FR3), Liste filterbar nach Kategorie und Tag. Bringt den Schreibweg aus §3.6 ins Spiel: Chrome auf macOS über die File System Access API, direktes Schreiben in `daten/katalog.json`, Backup vor jedem Schreiben.
+
+**Zieht drei Fragen mit sich**, die dann zu entscheiden sind: Wird der Katalog am Handy dadurch schreibbar (Stufe C), braucht es Item-Merge. Die Live-Vorschau wird erst mit ihm möglich. Und der Retro-Direktweg (US-08/FR15) setzt ihn voraus.
+
+**Warum verschoben**: Der Erstaufbau des Katalogs ist Bulk-Arbeit an 333 Items und gehört in ein Skript. Für die ersten echten Reisen genügt das Repo als Pflegeweg. Der Editor lohnt sich erst, wenn der Katalog steht und Einzeländerungen häufig werden.
+
+**Was ohne ihn fehlt**: die Live-Vorschau der Mengenregel (§4.2), der Direktweg Retro → Item (US-08/FR15) und die Tag-Verwaltung (FF-11).
 
 ### Stufe 1 — macht das Werkzeug mit der Zeit besser
 
@@ -544,7 +654,7 @@ Zuordnung Item → Tasche, plus Checkliste pro Tasche.
 Tags umbenennen, zusammenführen, löschen über viele Items.
 
 **FF-12 · PWA / Offline**
-Liste ohne Netz am Handy, echte Checkbox-Interaktion unterwegs. Wird wichtig, sobald das Tool produktiv genutzt wird — beim Tauchen gibt es selten WLAN.
+Liste ohne Netz am Handy, echte Checkbox-Interaktion unterwegs. Wird wichtig, sobald das Tool produktiv genutzt wird — beim Tauchen gibt es selten WLAN. **Zweiter Grund seit 1.3**: Als installierte Web-App ist der Speicher nach meinem Kenntnisstand von der 7-Tage-Räumung ausgenommen — das würde den Katalog am Handy dauerhaft halten und den Re-Import aus §4.5 ersparen (noch zu verifizieren).
 
 **FF-13 · Ausgabeformate**
 PDF, Druck, Kalender-Export (Packen einen Tag vorher erinnern).
@@ -648,6 +758,18 @@ Dabei entstehen zwei Lücken, die der Import-Report (F7) ausweisen muss:
 | Datenbank im MVP | Für Einzelnutzer mit lokaler Datei kein Nutzen, nur Betriebsaufwand |
 | Mengen als Ja/Nein | Lässt den realen Fehlerfall "zu wenig für 10 Tage" bestehen |
 | Tags als feste Enum-Liste | Hätte genau das Feature verhindert, das der Nutzer ausdrücklich will: unbekannte Aktivitäten eintippen |
+| Getrenntes Frontend/Backend | Kein Mehrbenutzerbetrieb, kein geteilter Zustand, keine Geheimnisse, die nur serverseitig liegen dürften. Ein zweiter Prozess wäre reiner Zusatzaufwand |
+| Python-Backend (FastAPI/Flask) | Rechnet nichts, was der Browser nicht rechnet. Python bleibt allein beim einmaligen Import-Skript (§3.6) |
+| Heroku | Seit Nov 2022 kein Free Tier, und es will einen laufenden Server, den diese App nicht braucht. Statisches Hosting ist das passende Werkzeug |
+| Lokaler Server auf dem Laptop | Hätte echte Dateien mit dem Handy verbunden, aber nur solange der Laptop läuft und im selben WLAN ist — genau der Fall, den das Packen unterwegs ausschließt |
+| `localStorage` für den Katalog | Nicht versionierbar, kein `git diff`, kein Undo, und auf iOS räumungsgefährdet. Der Schatz gehört in eine Datei (§4.5) |
+| UI-Framework (React/Svelte/Vue) | Fünf Ansichten, deren Kern eine reine Funktion ist. Vanilla JS reicht und spart eine Abhängigkeit |
+| Katalog-Editor im MVP | Bulk-Arbeit an 333 Items gehört in ein Skript. Der Editor lohnt sich erst, wenn der Katalog steht (FF-16) |
+| Katalog im Deployment (Weg 1) | Hätte das Handy automatisch aktuell gehalten, aber `katalog.json` wäre über die Deploy-URL für jeden abrufbar — und ein Zugriffsschutz hätte auf iOS einen Login-Schritt gekostet. Der Import per Button ist der billigere Preis (O11) |
+| Automatische Synchronisierung / Merge | Braucht einen Server oder eine Merge-Regel. Beides unnötig, solange Reisen nur am Handy entstehen (Stufe A) |
+| Reisen in beide Richtungen (Stufe B) | Kostet Merge-Logik pro Reise. Erst sinnvoll, wenn das Planen am Schreibtisch sich als echtes Bedürfnis zeigt — das Formular hat sechs Felder |
+| Verzeichnis `public/` für den Katalog | Vite kopiert `public/` unverändert in den Build — der Katalog wäre damit ungewollt deployt. Er liegt deshalb in `daten/` (§3.6) |
+| Git-Repo in iCloud Drive | iCloud und git vertragen sich nicht; Sync-Konflikte beschädigen `.git`. iCloud ist der Transport, nicht das Repository |
 
 ---
 
@@ -655,5 +777,7 @@ Dabei entstehen zwei Lücken, die der Import-Report (F7) ausweisen muss:
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 1.3 | 2026-10-08 | Datentransfer entschieden (O11 → Weg 2, Stufe A). Der Katalog wird **nicht deployt**; das Deployment enthält nur die App-Hülle, damit braucht die öffentliche Deploy-URL keinen Zugriffsschutz. Katalog und Reisen liegen am Handy im `localStorage`; der Katalog kommt per Import-Button (US-09) aus iCloud Drive, Reisen gehen per Share-Sheet als Backup zurück (US-10). Keine automatische Synchronisierung, keine Merge-Regel — Reisen entstehen nur am Handy. Neuer Abschnitt zu den Datenrichtungen (§4.5), neue Anforderungen FR17–FR19, US-09/US-10 ergänzt. Die File System Access API wandert mit FF-16 aus dem MVP (am Mac wird der Katalog in dieser Zeit per Editor bearbeitet). Katalog-Verzeichnis `public/` → `daten/`, damit Vite ihn nicht in den Build kopiert. §9, §12, FF-12 und Anhang C angepasst |
+| 1.2 | 2026-10-07 | Technische Architektur entschieden und als §3.6 aufgenommen: statisches Hosting, Vite + Vanilla JS, kein Backend. Persistenz umgestellt (§4.5): `katalog.json` bleibt versionierte Datei im Repo (Schreiben per File System Access API, Chrome/macOS), Reisen und Packlisten wandern in `localStorage`. Katalog-Editor aus dem MVP in die erste Überarbeitung verschoben (US-01, FR1, FR3 → FF-16); Katalogpflege im MVP über Repo und Import-Skript (§3.3). US-08/FR15 eingeschränkt, da der Retro-Direktweg den Editor voraussetzt. Zeitplan und NFR angepasst. O2 präzisiert, O11 (Zugriffsschutz für `katalog.json`) neu aufgenommen |
 | 1.1 | 2026-10-07 | Verkehrsmittel von Regelwerk auf Tag umgestellt (F9). Persistenz auf zwei Dateien aufgeteilt (§4.5). `Camping` von Aktivität zu Unterkunft verschoben, `Anlass`-Gruppe entfernt. Kategorie `Tauchausrüstung` ergänzt, `Medikamente`/`Reiseapotheke` zu `Medizin` zusammengeführt. Katalog auf 11 Kategorien und 5 Tag-Gruppen gefroren (Anhang B). `nicht_mit` präzisiert: positive Tags decken mehr ab als zunächst angenommen (§5.3). O1–O7, O9, O10 entschieden |
 | 1.0 | 2026-10-07 | Erster Entwurf |
