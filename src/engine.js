@@ -38,12 +38,12 @@ export const KATEGORIEN = [
  * Datenmodell nicht.
  */
 export const TAG_GRUPPEN = [
-  { gruppe: 'Basis', tags: ['Allgemein'] },
+  { gruppe: 'Basis', tags: ['Allgemein', 'Reiseapotheke'] },
   { gruppe: 'Klima / Saison', tags: ['Winter', 'Sommer', 'Übergangszeit', 'Regen'] },
   { gruppe: 'Verkehrsmittel', tags: ['Flugzeug', 'Auto', 'Zug'] },
   {
     gruppe: 'Aktivität',
-    tags: ['Tauchen', 'Festival', 'Wandern', 'Strand', 'Ski', 'Städtetrip', 'Arbeit', 'Fotografie', 'Sport'],
+    tags: ['Tauchen', 'Festival', 'Wandern', 'Strand', 'Ski', 'Städtetrip', 'Arbeit', 'Fotografie', 'UW-Fotografie'],
   },
   { gruppe: 'Unterkunft', tags: ['Camping', 'Ferienwohnung', 'Hotel', 'Hostel', 'Freunde'] },
 ];

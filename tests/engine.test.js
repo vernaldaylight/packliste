@@ -4,7 +4,7 @@
  * Zwei Ebenen:
  *  1. Synthetische Fälle — jede Regel der PRD einzeln, inklusive der Beispiele
  *     aus §5.2 und §4.2.
- *  2. Der echte Katalog (`daten/katalog.json`, 265 Items) — die Engine muss
+ *  2. Der echte Katalog (`daten/katalog.json`, 262 Items) — die Engine muss
  *     gegen die echten Daten laufen, nicht nur gegen Spielzeug (PRD §3.5).
  *
  * Lauf: npm test
@@ -351,13 +351,17 @@ test('echter Katalog: Winterreise und Sommerreise unterscheiden sich', () => {
 });
 
 test('echter Katalog: keine Reise liefert eine leere Liste', () => {
+  // Die Untergrenze ist bewusst grob: sie soll fangen, dass `Allgemein` gar nicht
+  // mehr greift, nicht die genaue Item-Zahl festschreiben. Seit dem Medizin-Tag
+  // (Reiseapotheke, 47 Items) liegt der Grundstock einer reinen Saisonreise bei 88 —
+  // vorher bei 135.
   for (const saison of ['Winter', 'Sommer', 'Übergangszeit']) {
     const liste = erzeugePackliste(katalog, { id: 'y', saison, von: '2026-06-01', bis: '2026-06-03' });
-    assert.ok(liste.positionen.length >= 100, `${saison}: nur ${liste.positionen.length} Positionen — Allgemein trägt nicht`);
+    assert.ok(liste.positionen.length >= 80, `${saison}: nur ${liste.positionen.length} Positionen — Allgemein trägt nicht`);
   }
 });
 
-test('Performance: 265 Items in deutlich unter 200 ms (PRD §9)', () => {
+test('Performance: 262 Items in deutlich unter 200 ms (PRD §9)', () => {
   const reise = { id: 'p', von: '2026-06-01', bis: '2026-06-14', saison: 'Sommer', aktivitaeten: ['Tauchen', 'Wandern'], verkehrsmittel: 'Flugzeug', unterkunft: 'Camping' };
   const start = performance.now();
   for (let i = 0; i < 100; i++) erzeugePackliste(katalog, reise);

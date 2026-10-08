@@ -710,10 +710,10 @@ Gespeichert als flache Strings; gruppiert nur für die Darstellung im Formular.
 
 | Gruppe | Tags | Quelle |
 |---|---|---|
-| **Basis** | Allgemein | Excel |
+| **Basis** | Allgemein, Reiseapotheke | Excel + neu |
 | **Klima / Saison** | Winter, Sommer, Übergangszeit, Regen | Excel + neu (Übergangszeit, Regen) |
 | **Verkehrsmittel** | Flugzeug, Auto, Zug | neu |
-| **Aktivität** | Tauchen, Festival, Wandern, Strand, Ski, Städtetrip, Arbeit, Fotografie, Sport | Excel + neu |
+| **Aktivität** | Tauchen, Festival, Wandern, Strand, Ski, Städtetrip, Arbeit, Fotografie, UW-Fotografie | Excel + neu |
 | **Unterkunft** | Camping, Ferienwohnung, Hotel, Hostel, Freunde | Excel + neu |
 
 `Camping` liegt unter **Unterkunft**, nicht unter Aktivität — man übernachtet beim Camping, das ist die Variable, die die Ausrüstung bestimmt. `Zelt` als eigener Tag entfällt damit.
@@ -724,6 +724,7 @@ Eine **Anlass**-Gruppe entfällt ersatzlos.
 
 | Tag | Warum |
 |---|---|
+| **Reiseapotheke** | Hat die Kategorie `Medizin` von `Allgemein` gelöst. Die 47 Medizin-Items waren ein Drittel jeder Packliste (47 von 151 Positionen auf einer typischen Reise) — eine Reiseapotheke packt man aber nicht in dieser Breite ein. Der Tag steht unter **Basis**, weil er wie `Allgemein` die Grundausstattung beschreibt, nicht einen Anlass |
 | **Übergangszeit** | Zwischen Winter und Sommer liegt der Großteil der Reisen. Ohne diesen Tag gibt es für milde Reisen keine saubere Auswahl — man landet bei Winter oder Sommer und packt falsch |
 | **Regen** | Regenjacke, Schirm, wasserdichte Schuhe. Trifft jede Jahreszeit und ist unabhängig von der Saison |
 | **Flugzeug / Auto / Zug** | Ausdrücklicher Wunsch. Ersetzt jedes Verkehrsmittel-Regelwerk durch Tags (§4.3) |
@@ -732,8 +733,8 @@ Eine **Anlass**-Gruppe entfällt ersatzlos.
 | **Ski** | Wintersport braucht völlig eigenes Gerät; ohne diesen Tag ist `Winter` zu grob |
 | **Städtetrip** | Anderes Packverhalten als Strand oder Wandern: bequeme Schuhe, Tagesrucksack, wenig Gepäck |
 | **Arbeit** | Laptop, Businesskleidung, Adapter — eigene Anforderung |
-| **Fotografie** | Kamera, Objektive, Speicherkarten, Stativ |
-| **Sport** | Laufschuhe, Fitnesszeug für Hotel/Urlaub |
+| **Fotografie** | Kamera, Objektive, Speicherkarten, Stativ — Fotografie **an Land** |
+| **UW-Fotografie** | Unterwasser-Fotografie. Eigener Tag, weil die Ausrüstung eine andere ist: Gehäuse, Arme, Blitz, Fiberkabel und Ladegerät der UW-Kamera kommen nur beim Tauchen mit, während Kamera und Speicherkarte auf beide Reisen gehen. Ein Item trägt daher `Fotografie`, `UW-Fotografie` oder beide |
 | **Ferienwohnung** | Selbstversorgung: Küchenausstattung, Wäscheleine, Einkaufsbeutel. Ein Hotel braucht davon nichts |
 | **Hotel** | Gegenstück zur Ferienwohnung: keine Küche, dafür Handtücher und Föhn vorhanden. Handtuch und Föhn werden deshalb einfach *nicht* mit `Hotel` getaggt — sie brauchen kein `nicht_mit` |
 | **Hostel** | Wie Hotel, plus Schloss für Schließfach, Ohrstöpsel, Flip-Flops für Gemeinschaftsduschen |
@@ -777,6 +778,9 @@ Dabei entstehen zwei Lücken, die der Import-Report (F7) ausweisen muss:
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 1.6 | 2026-10-08 | Tags aufgeräumt. Neuer Tag **`UW-Fotografie`** in Anhang B.2 (Gruppe **Aktivität**): Unterwasser-Foto-Gerät (Gehäuse, Box, Auftriebskörper, Glasfaserkabel, Kleinteile, UW-Kamera, Ladegerät) hing an `Tauchen`, während Kamera und Zubehör an `Fotografie` hingen — auf einer Tauchreise kam so das Gehäuse ohne Kamera mit. Jetzt trägt das reine UW-Gerät nur `UW-Fotografie`; Kamera, SD Karte, Festplatte, Blitz, Arme, Diffusor, Fisheye, Schellen, GoPro und das Ladegerät der Kamera tragen beides und kommen auf Land- wie UW-Fotoreisen. `Flugzeug` war mit einem einzigen Item leer: `Nackenkissen` und ein Beutel (**Allgemein** weg, sie kommen nur auf Flugreisen mit), `Wollsocken` und `Sonnencreme` tragen es zusätzlich (PRD §4.3, §5.2). `Handtuch` verliert `Allgemein` (schickte es auch ins Hotel, das laut B.2 keins braucht) und hängt jetzt an `Strand`/`Camping`/`Ferienwohnung`/`Hostel`. `Ohrstöpsel` von `Allgemein` auf `Hostel`/`Camping`. Wirkungslose Doppel-Tags entfernt, wo `Allgemein` schon alles abdeckt (`Hausschuhe`, `Taschentücher`, `Wasserbehälter`). `Poncho` zusätzlich an `Strand`. Die fünf Kleidungsstücke mit `Tauchen` bleiben als Trocki-Unterzeug — PRD §6.2 verlangt hier bewusst Handarbeit, kein Automatismus |
+| 1.5 | 2026-10-08 | Neuer Tag `Reiseapotheke` in Anhang B.2 (Gruppe **Basis**). Die Kategorie `Medizin` hängt nicht mehr an `Allgemein`: ihre 47 Items trugen ein Drittel jeder Packliste bei und kommen jetzt nur noch mit, wenn der Tag gewählt wird. Die Actionkamera verliert `Sport` und hängt an `Fotografie`, das Sportoberteil an `Allgemein`. `mapping.json` und `erwartungen.json` bleiben bewusst auf ihrem Stand — sie beschreiben den Lauf des stillgelegten Imports, nicht mehr den Katalog, und können Löschungen und Umbenennungen ohnehin nicht abbilden. Sie sind ab jetzt historisch |
+| 1.4 | 2026-10-08 | Katalog interaktiv überarbeitet. Tag `Sport` aus Anhang B.2 entfernt — er trug nur zwei Items (eine Actionkamera und ein Sportoberteil), und beide kamen über andere Tags ohnehin mit; die im PRD genannten Laufschuhe und Fitnesszeug wurden nie in den Katalog aufgenommen. `daten/katalog.json` wird ab jetzt **von Hand gepflegt**: der Excel-Import ist einmal gelaufen und danach totgelegt (`import.mjs --write` gesperrt, `npm run katalog` entfernt), weil `mapping.json` keine Umbenennungen, Löschungen oder Tag-Korrekturen kennt und die Pflegearbeit sonst überschreiben würde. Katalog 265 → 262 Items: `Jacke`, `Pulli`, `Schal`, `Schuhe`, `Strumpfkopf` gelöscht, fünf Items umbenannt, zwei dünne Kopfbedeckungen ergänzt |
 | 1.3 | 2026-10-08 | Datentransfer entschieden (O11 → Weg 2, Stufe A). Der Katalog wird **nicht deployt**; das Deployment enthält nur die App-Hülle, damit braucht die öffentliche Deploy-URL keinen Zugriffsschutz. Katalog und Reisen liegen am Handy im `localStorage`; der Katalog kommt per Import-Button (US-09) aus iCloud Drive, Reisen gehen per Share-Sheet als Backup zurück (US-10). Keine automatische Synchronisierung, keine Merge-Regel — Reisen entstehen nur am Handy. Neuer Abschnitt zu den Datenrichtungen (§4.5), neue Anforderungen FR17–FR19, US-09/US-10 ergänzt. Die File System Access API wandert mit FF-16 aus dem MVP (am Mac wird der Katalog in dieser Zeit per Editor bearbeitet). Katalog-Verzeichnis `public/` → `daten/`, damit Vite ihn nicht in den Build kopiert. §9, §12, FF-12 und Anhang C angepasst |
 | 1.2 | 2026-10-07 | Technische Architektur entschieden und als §3.6 aufgenommen: statisches Hosting, Vite + Vanilla JS, kein Backend. Persistenz umgestellt (§4.5): `katalog.json` bleibt versionierte Datei im Repo (Schreiben per File System Access API, Chrome/macOS), Reisen und Packlisten wandern in `localStorage`. Katalog-Editor aus dem MVP in die erste Überarbeitung verschoben (US-01, FR1, FR3 → FF-16); Katalogpflege im MVP über Repo und Import-Skript (§3.3). US-08/FR15 eingeschränkt, da der Retro-Direktweg den Editor voraussetzt. Zeitplan und NFR angepasst. O2 präzisiert, O11 (Zugriffsschutz für `katalog.json`) neu aufgenommen |
 | 1.1 | 2026-10-07 | Verkehrsmittel von Regelwerk auf Tag umgestellt (F9). Persistenz auf zwei Dateien aufgeteilt (§4.5). `Camping` von Aktivität zu Unterkunft verschoben, `Anlass`-Gruppe entfernt. Kategorie `Tauchausrüstung` ergänzt, `Medikamente`/`Reiseapotheke` zu `Medizin` zusammengeführt. Katalog auf 11 Kategorien und 5 Tag-Gruppen gefroren (Anhang B). `nicht_mit` präzisiert: positive Tags decken mehr ab als zunächst angenommen (§5.3). O1–O7, O9, O10 entschieden |

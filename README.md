@@ -18,8 +18,9 @@ Die App startet ohne Katalog und zeigt die Import-Aufforderung. `daten/katalog.j
 ```bash
 npm test             # 52 Tests: Regel-Engine und Persistenz
 npm run build        # dist/ — nur die App-Hülle
-npm run katalog      # Import-Skript: quellen/ -> daten/katalog.json
 ```
+
+Es gibt bewusst kein `npm run katalog` mehr — siehe „Katalog pflegen".
 
 ## Aufbau
 
@@ -32,7 +33,8 @@ src/
 daten/
   katalog.json  der Schatz — im git, NICHT deployt
 import/
-  import.mjs    einmalig: quellen/packliste.xlsx -> daten/katalog.json
+  import.mjs    einmalig gelaufen: quellen/packliste.xlsx -> daten/katalog.json
+                danach totgelegt, siehe „Katalog pflegen"
   mapping.json  die Entscheidungen des Imports (Kategorien, Tags, Ausnahmen)
   erwartungen.json  Regressionstest gegen stilles Falschsortieren
 tests/
@@ -86,6 +88,22 @@ npm run dev   # in einem zweiten Terminal laufen lassen
 Am Mac entsteht der Katalog, am Handy wird er benutzt. Änderungen laufen über
 `daten/katalog.json` und einen Commit — es gibt im MVP bewusst keinen
 Katalog-Editor in der UI (der kommt mit FF-16).
+
+**`daten/katalog.json` wird von Hand gepflegt.** Der Excel-Import ist einmal
+gelaufen und danach totgelegt: `mapping.json` und `import.mjs` kennen nur die
+Quelltabelle und wissen nichts von umbenannten, gelöschten oder neu getaggten
+Items. Ein Lauf mit `--write` würde diese Arbeit überschreiben, deshalb ist der
+Schreibpfad gesperrt (`--trotzdem-schreiben` nötig).
+
+Der **Trockenlauf** bleibt offen und ist weiter nützlich — er liest die Excel,
+prüft gegen `erwartungen.json` und schreibt nur `import/import-report.md`:
+
+```bash
+node import/import.mjs        # nur lesen, prüfen, Report
+```
+
+Die Datei ist nach `name` sortiert (`localeCompare` mit Locale `de`). Wer Items
+einfügt oder umbenennt, sortiert neu — sonst wandert die Zeile ans falsche Ende.
 
 Damit eine Änderung am Handy ankommt, muss die Datei dort neu importiert werden.
 Am Handy ist der Katalog read-only.
