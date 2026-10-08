@@ -143,6 +143,12 @@ test('zusatz_tags kommen dazu, entfernte_tags fallen weg', () => {
   assert.ok(!tags.has('Sommer'));
 });
 
+test('Allgemein lässt sich nicht abwählen', () => {
+  const tags = tripTags({ saison: 'Sommer', entfernte_tags: ['Allgemein', 'Sommer'] });
+  assert.ok(tags.has('Allgemein'), 'Allgemein bleibt Fundament jeder Reise');
+  assert.ok(!tags.has('Sommer'));
+});
+
 test('Verkehrsmittel ist ein Tag wie jeder andere (O7)', () => {
   assert.ok(tripTags({ verkehrsmittel: 'Auto' }).has('Auto'));
   assert.ok(!tripTags({ verkehrsmittel: 'Auto' }).has('Flugzeug'));
@@ -380,15 +386,15 @@ test('echter Katalog: Winterreise und Sommerreise unterscheiden sich', { skip: n
 test('echter Katalog: keine Reise liefert eine leere Liste', { skip: nurMitEchtemKatalog }, () => {
   // Die Untergrenze ist bewusst grob: sie soll fangen, dass `Allgemein` gar nicht
   // mehr greift, nicht die genaue Item-Zahl festschreiben. Seit dem Medizin-Tag
-  // (Reiseapotheke, 47 Items) liegt der Grundstock einer reinen Saisonreise bei 88 —
-  // vorher bei 135.
+  // (Reiseapotheke, 47 Items) liegt der Grundstock einer reinen Saisonreise bei 86 —
+  // vorher bei 88 (und davor 135).
   for (const saison of ['Winter', 'Sommer', 'Übergangszeit']) {
     const liste = erzeugePackliste(katalog, { id: 'y', saison, von: '2026-06-01', bis: '2026-06-03' });
     assert.ok(liste.positionen.length >= 80, `${saison}: nur ${liste.positionen.length} Positionen — Allgemein trägt nicht`);
   }
 });
 
-test('Performance: 262 Items in deutlich unter 200 ms (PRD §9)', { skip: nurMitEchtemKatalog }, () => {
+test('Performance: 259 Items in deutlich unter 200 ms (PRD §9)', { skip: nurMitEchtemKatalog }, () => {
   const reise = { id: 'p', von: '2026-06-01', bis: '2026-06-14', saison: 'Sommer', aktivitaeten: ['Tauchen', 'Wandern'], verkehrsmittel: 'Flugzeug', unterkunft: 'Camping' };
   const start = performance.now();
   for (let i = 0; i < 100; i++) erzeugePackliste(katalog, reise);

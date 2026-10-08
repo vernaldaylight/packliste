@@ -8,6 +8,8 @@
  * Auswahllogik (PRD §5.1):
  *   tripTags = {saison} ∪ aktivitaeten ∪ {verkehrsmittel} ∪ {unterkunft}
  *              ∪ zusatz_tags ∪ {"Allgemein"}   \ entfernte_tags
+ *   `Allgemein` ist das Fundament und lässt sich nicht streichen — entfernte_tags
+ *   kann es nicht abwählen.
  *   item überspringen, wenn item.nicht_mit ∩ tripTags ≠ ∅
  *   item aufnehmen,   wenn item.tags     ∩ tripTags ≠ ∅
  */
@@ -53,6 +55,15 @@ export const BEKANNTE_TAGS = TAG_GRUPPEN.flatMap((g) => g.tags);
 
 /** Das Fundament jeder Reise (PRD §5.1): ohne diesen Tag gäbe es keine Zahnbürste. */
 export const BASIS_TAG = 'Allgemein';
+
+/** Die Basis-Tags (PRD Anhang B.2). */
+export const BASIS_TAGS = TAG_GRUPPEN.find((g) => g.gruppe === 'Basis').tags;
+
+/**
+ * Der einzige Basis-Tag, den das Formular zur Wahl stellt. `Allgemein` ist immer
+ * dabei und wird nicht als Schalter gezeigt — die Reiseapotheke dagegen schon.
+ */
+export const WAHLBARE_BASIS_TAGS = BASIS_TAGS.filter((t) => t !== BASIS_TAG);
 
 export const SAISONS = ['Winter', 'Sommer', 'Übergangszeit'];
 export const VERKEHRSMITTEL = ['Flugzeug', 'Auto', 'Zug'];
@@ -168,7 +179,8 @@ export function tripTags(reise) {
   if (reise?.unterkunft) tags.add(reise.unterkunft);
   for (const t of reise?.zusatz_tags ?? []) if (t) tags.add(t);
 
-  for (const t of reise?.entfernte_tags ?? []) tags.delete(t);
+  // `Allgemein` ist nicht abwählbar: es bleibt, auch wenn es in entfernte_tags steht.
+  for (const t of reise?.entfernte_tags ?? []) if (t !== BASIS_TAG) tags.delete(t);
 
   return tags;
 }

@@ -351,6 +351,13 @@ textarea:focus-visible,
   background: transparent;
 }
 
+/* Fester Basis-Tag: immer dabei, nicht zu streichen (Reise-Formular) */
+.chip-fix {
+  cursor: default;
+  border-style: dashed;
+  color: var(--text);
+}
+
 .chip-schalter.ist-an {
   background: var(--akzent);
   border-color: var(--akzent);

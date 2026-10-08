@@ -8,7 +8,12 @@
  * Die abgeleiteten Tags sind sichtbar und einzeln entfernbar (US-03). Entfernte
  * Tags landen in `entfernte_tags` und lassen sich von dort wieder aufnehmen —
  * ohne diese Gegenbuchse wäre ein abgeleiteter Tag nur durch Leeren des ganzen
- * Feldes loszuwerden (siehe engine.js, tripTags).
+ * Feldes loszuwerden (siehe engine.js, tripTags). Ausnahme ist `Allgemein`: es
+ * ist das Fundament jeder Reise und lässt sich nicht streichen.
+ *
+ * Die Basis-Tags stehen in einer eigenen Karte. `Reiseapotheke` ist dort ein
+ * normaler Schalter — die Kategorie `Medizin` hängt an ihm, nicht an `Allgemein`,
+ * und ohne diese Karte wäre er im Formular gar nicht wählbar.
  *
  * Aktivitäten sind Vorschlagsliste plus Freitext (US-03): die bekannten als
  * Schalter, unbekannte tippt man ein. Damit ist die App nicht auf die heute
@@ -26,6 +31,7 @@ import {
   VERKEHRSMITTEL,
   UNTERKUNFT,
   BASIS_TAG,
+  WAHLBARE_BASIS_TAGS,
 } from '../engine.js';
 
 export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
@@ -59,6 +65,7 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
   /* --- Container, die aktualisiere() neu füllt ---------------------------- */
 
   const tageAnzeige = h('strong', { class: 'wert' });
+  const basisAnzeige = h('div', { class: 'tag-reihe' });
   const saisonAnzeige = h('div', { class: 'tag-reihe' });
   const aktivitaetAnzeige = h('div', { class: 'tag-reihe' });
   const verkehrsAnzeige = h('div', { class: 'tag-reihe' });
@@ -169,11 +176,35 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
       )
     );
 
-    // Zusatz-Tags (frei eingetippt)
+    // Basis: Allgemein liegt fest, die Reiseapotheke ist ein Schalter
+    basisAnzeige.replaceChildren(
+      h('span', { class: 'chip chip-fix', title: `${BASIS_TAG} ist immer dabei` }, BASIS_TAG),
+      ...WAHLBARE_BASIS_TAGS.map((t) => {
+        const an = entwurf.zusatz_tags.includes(t);
+        return h(
+          'button',
+          {
+            type: 'button',
+            class: `chip chip-schalter${an ? ' ist-an' : ''}`,
+            'aria-pressed': String(an),
+            onclick: () => {
+              entwurf.zusatz_tags = an
+                ? entwurf.zusatz_tags.filter((x) => x !== t)
+                : [...entwurf.zusatz_tags, t];
+              aktualisiere();
+            },
+          },
+          t
+        );
+      })
+    );
+
+    // Zusatz-Tags (frei eingetippt) — ohne die Basis-Tags, die oben ihren Schalter haben
+    const eigeneTags = entwurf.zusatz_tags.filter((t) => !WAHLBARE_BASIS_TAGS.includes(t));
     zusatzAnzeige.replaceChildren(
-      ...(entwurf.zusatz_tags.length === 0
+      ...(eigeneTags.length === 0
         ? [h('span', { class: 'klein' }, 'noch keine')]
-        : entwurf.zusatz_tags.map((t) =>
+        : eigeneTags.map((t) =>
             entfernbarerChip(t, () => {
               entwurf.zusatz_tags = entwurf.zusatz_tags.filter((x) => x !== t);
               aktualisiere();
@@ -181,8 +212,8 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
           ))
     );
 
-    // Abgeleitete Tags: sichtbar, einzeln entfernbar (US-03)
-    const abgeleitet = [...abgeleiteteTags(entwurf)].sort();
+    // Abgeleitete Tags: sichtbar, einzeln entfernbar (US-03) — außer Allgemein
+    const abgeleitet = [...abgeleiteteTags(entwurf)].filter((t) => t !== BASIS_TAG).sort();
     abgeleitetAnzeige.replaceChildren(
       ...abgeleitet.map((t) => {
         const weg = entwurf.entfernte_tags.includes(t);
@@ -228,8 +259,9 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
     }
 
     // Cruft wegräumen: gestrichene Tags, die gar nicht mehr abgeleitet werden.
+    // `Allgemein` fällt raus — es ist nicht abwählbar.
     const nochAbgeleitet = abgeleiteteTags(entwurf);
-    entwurf.entfernte_tags = entwurf.entfernte_tags.filter((t) => nochAbgeleitet.has(t));
+    entwurf.entfernte_tags = entwurf.entfernte_tags.filter((t) => t !== BASIS_TAG && nochAbgeleitet.has(t));
 
     let reise;
     if (entwurf.id) {
@@ -286,6 +318,16 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
       h('p', { class: 'feld-hinweis' }, 'Reisedauer: ', tageAnzeige)
     ),
 
+    karte(
+      'Basis',
+      basisAnzeige,
+      h(
+        'p',
+        { class: 'feld-hinweis' },
+        `„${BASIS_TAG}" ist immer dabei und lässt sich nicht abwählen. Die Reiseapotheke hängt an ihrer eigenen Kategorie Medizin — ohne diesen Schalter kommen die Medikamente nicht mit.`
+      )
+    ),
+
     karte('Saison', saisonAnzeige),
 
     karte(
@@ -311,7 +353,11 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
 
     karte(
       'Abgeleitete Tags',
-      h('p', { class: 'feld-hinweis' }, 'Das kommt aus deinen Angaben. Antippen streicht einen Tag für diese Reise; mit ↺ holst du ihn zurück.'),
+      h(
+        'p',
+        { class: 'feld-hinweis' },
+        `Das kommt aus deinen Angaben. Antippen streicht einen Tag für diese Reise; mit ↺ holst du ihn zurück. „${BASIS_TAG}" steht hier nicht — es ist nicht abwählbar.`
+      ),
       abgeleitetAnzeige,
       h('h3', { class: 'unter-titel' }, 'Zusätzliche Tags'),
       zusatzAnzeige,
