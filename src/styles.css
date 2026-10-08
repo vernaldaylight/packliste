@@ -1,0 +1,694 @@
+/*
+ * styles.css — alles in einer Datei.
+ *
+ * Handy zuerst (PRD §9): einhändig bedienbar, Touch-Ziele ≥ 44 px,
+ * ausreichender Kontrast. Die helle und die dunkle Fassung teilen sich
+ * dieselben Tokens, damit nichts doppelt gepflegt werden muss.
+ */
+
+:root {
+  --grund: #f6f6f4;
+  --flaeche: #ffffff;
+  --flaeche-2: #eeeeec;
+  --rand: #dcdcd7;
+  --text: #1c1c1a;
+  --text-leise: #5f5f59;
+  --akzent: #1f5f4b;
+  --akzent-text: #ffffff;
+  --ok: #1f5f4b;
+  --warnung: #7a5200;
+  --warnung-flaeche: #fdf3dc;
+  --fehler: #8c2020;
+  --fehler-flaeche: #fbe9e9;
+  --radius: 12px;
+  --abstand: 16px;
+  --ziel: 44px; /* kleinste Touch-Fläche */
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --grund: #16171a;
+    --flaeche: #1f2126;
+    --flaeche-2: #2a2d33;
+    --rand: #383b42;
+    --text: #eceef1;
+    --text-leise: #a9adb5;
+    --akzent: #4fb08d;
+    --akzent-text: #10201a;
+    --ok: #4fb08d;
+    --warnung: #e0b055;
+    --warnung-flaeche: #33290f;
+    --fehler: #ff9a9a;
+    --fehler-flaeche: #3a1d1d;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--grund);
+  color: var(--text);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  overflow-wrap: break-word;
+}
+
+.inhalt {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: var(--abstand);
+  padding-bottom: calc(var(--abstand) + env(safe-area-inset-bottom));
+  padding-left: calc(var(--abstand) + env(safe-area-inset-left));
+  padding-right: calc(var(--abstand) + env(safe-area-inset-right));
+}
+
+.lade-hinweis {
+  color: var(--text-leise);
+}
+
+/* --- Kopfzeile ----------------------------------------------------------- */
+
+.kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--abstand);
+  flex-wrap: wrap;
+  margin-bottom: calc(var(--abstand) * 1.5);
+}
+
+.kopf-titel {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--text);
+  text-decoration: none;
+  letter-spacing: -0.01em;
+}
+
+.kopf-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.kopf-nav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--ziel);
+  padding: 0 12px;
+  border-radius: var(--radius);
+  color: var(--text-leise);
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+
+.kopf-nav a:hover {
+  background: var(--flaeche-2);
+  color: var(--text);
+}
+
+/* --- Grundformen --------------------------------------------------------- */
+
+.stapel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--abstand);
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+h3.unter-titel {
+  font-size: 0.95rem;
+  margin: 8px 0 0;
+  color: var(--text-leise);
+}
+
+.karte {
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: var(--radius);
+  padding: var(--abstand);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.karte-titel {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.karte > p {
+  margin: 0;
+}
+
+.klein,
+.feld-hinweis {
+  color: var(--text-leise);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.kopf-reihe {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--abstand);
+  flex-wrap: wrap;
+}
+
+.zeile {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.zeile > * {
+  flex: 1 1 10rem;
+}
+
+code {
+  background: var(--flaeche-2);
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-size: 0.9em;
+}
+
+.schritte {
+  margin: 0;
+  padding-left: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-leise);
+}
+
+/* --- Knöpfe (Touch-Ziel ≥ 44 px, PRD §9) --------------------------------- */
+
+.knopf {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--ziel);
+  padding: 0 16px;
+  border: 1px solid var(--rand);
+  border-radius: var(--radius);
+  background: var(--flaeche);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.95rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.knopf:hover:not(:disabled) {
+  background: var(--flaeche-2);
+}
+
+.knopf:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.knopf-haupt {
+  background: var(--akzent);
+  border-color: var(--akzent);
+  color: var(--akzent-text);
+  font-weight: 600;
+}
+
+.knopf-haupt:hover:not(:disabled) {
+  filter: brightness(1.08);
+  background: var(--akzent);
+}
+
+.knopf-leise {
+  background: transparent;
+  border-color: transparent;
+  color: var(--text-leise);
+}
+
+.knopf-gefahr {
+  color: var(--fehler);
+  border-color: var(--rand);
+  background: transparent;
+}
+
+.knopf-reihe {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.klebrig {
+  position: sticky;
+  bottom: 0;
+  padding: 12px 0;
+  background: linear-gradient(to top, var(--grund) 70%, transparent);
+}
+
+.versteckt {
+  display: none;
+}
+
+.datei-waehler {
+  display: inline-flex;
+}
+
+/* --- Formularfelder ------------------------------------------------------ */
+
+.feld {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.feld-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-leise);
+}
+
+input[type='text'],
+input[type='date'],
+input[type='number'],
+select,
+textarea {
+  font: inherit;
+  font-size: 1rem; /* ≥ 16px, sonst zoomt iOS Safari beim Fokus */
+  color: var(--text);
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-height: var(--ziel);
+  width: 100%;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+.knopf:focus-visible,
+.chip:focus-visible {
+  outline: 3px solid var(--akzent);
+  outline-offset: 1px;
+}
+
+.freitext {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.freitext input {
+  flex: 1 1 auto;
+}
+
+/* --- Chips --------------------------------------------------------------- */
+
+.tag-reihe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 0;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--rand);
+  background: var(--flaeche-2);
+  color: var(--text-leise);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.chip-ruhig {
+  cursor: default;
+  background: transparent;
+}
+
+.chip-schalter.ist-an {
+  background: var(--akzent);
+  border-color: var(--akzent);
+  color: var(--akzent-text);
+  font-weight: 600;
+}
+
+.chip-schalter.chip-aus {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.chip-leise {
+  background: transparent;
+  font-size: 0.8rem;
+}
+
+.chip-eigen {
+  background: var(--flaeche-2);
+  color: var(--text);
+}
+
+.chip-weg {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 1.05rem;
+  line-height: 1;
+  padding: 2px 4px;
+  cursor: pointer;
+  min-height: auto;
+}
+
+/* --- Reiseliste ---------------------------------------------------------- */
+
+.reise-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reise-karte {
+  background: var(--flaeche);
+  border: 1px solid var(--rand);
+  border-radius: var(--radius);
+  padding: var(--abstand);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.reise-kopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.reise-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.reise-name:hover {
+  color: var(--akzent);
+}
+
+.reise-zeitraum {
+  color: var(--text-leise);
+  font-size: 0.9rem;
+}
+
+/* --- Packliste ----------------------------------------------------------- */
+
+.fortschritt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fortschritt-balken {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--flaeche-2);
+  overflow: hidden;
+}
+
+.fortschritt-fuell {
+  height: 100%;
+  background: var(--akzent);
+  transition: width 0.15s ease-out;
+}
+
+.kategorie-titel {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+}
+
+.zaehler {
+  font-size: 0.85rem;
+  font-weight: 400;
+  color: var(--text-leise);
+}
+
+.pos-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pos {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--ziel);
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rand);
+  flex-wrap: wrap;
+}
+
+.pos:last-child {
+  border-bottom: 0;
+}
+
+.pos-haupt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 10rem;
+  min-height: var(--ziel);
+  cursor: pointer;
+}
+
+.pos-name {
+  font-size: 1rem;
+}
+
+/* Abgehakte Positionen bleiben sichtbar, nur leiser (US-06) */
+.pos.ist-gepackt .pos-name {
+  text-decoration: line-through;
+  color: var(--text-leise);
+}
+
+.haken {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  accent-color: var(--akzent);
+}
+
+.pos-menge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.schritt {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--rand);
+  background: var(--flaeche);
+  color: var(--text);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.schritt:hover {
+  background: var(--flaeche-2);
+}
+
+.menge {
+  width: 3.2rem;
+  min-height: 40px;
+  text-align: center;
+  padding: 4px;
+}
+
+.pos-weg {
+  min-width: var(--ziel);
+  min-height: 40px;
+  font-size: 1.2rem;
+  padding: 0 10px;
+}
+
+.marken {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.marke {
+  font-size: 0.72rem;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--flaeche-2);
+  color: var(--text-leise);
+  white-space: nowrap;
+}
+
+.marke-eigen {
+  background: var(--akzent);
+  color: var(--akzent-text);
+}
+
+.marke-geaendert {
+  background: var(--warnung-flaeche);
+  color: var(--warnung);
+}
+
+.suche {
+  margin-bottom: 4px;
+}
+
+.pos-hinzufuegen {
+  border-color: var(--rand);
+  flex: 0 0 auto;
+}
+
+/* Trefferliste der Suche — bewusst eigene Klassen, nicht die der Packliste */
+.treffer-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 20rem;
+  overflow-y: auto;
+}
+
+.treffer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--rand);
+}
+
+.treffer:last-child {
+  border-bottom: 0;
+}
+
+.vorlage {
+  background: var(--flaeche-2);
+  border-radius: 10px;
+  padding: 12px;
+  overflow-x: auto;
+  font-size: 0.8rem;
+  margin: 0;
+  white-space: pre;
+}
+
+/* --- Katalogansicht ------------------------------------------------------ */
+
+.daten-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.daten-liste li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--rand);
+  font-size: 0.92rem;
+}
+
+.daten-liste li:last-child {
+  border-bottom: 0;
+}
+
+.daten-liste li span {
+  color: var(--text-leise);
+}
+
+/* --- Meldungen ----------------------------------------------------------- */
+
+.meldung {
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  border: 1px solid var(--rand);
+  background: var(--flaeche);
+  margin-bottom: var(--abstand);
+  font-size: 0.92rem;
+}
+
+.meldung-ok {
+  border-color: var(--ok);
+  color: var(--ok);
+}
+
+.meldung-fehler {
+  border-color: var(--fehler);
+  background: var(--fehler-flaeche);
+  color: var(--fehler);
+}
+
+.meldung-fehler ul {
+  margin: 8px 0 0;
+  padding-left: 1.2rem;
+}
+
+.meldung-fehler p {
+  margin: 6px 0 0;
+}
+
+.meldung-warnung {
+  border-color: var(--warnung);
+  background: var(--warnung-flaeche);
+  color: var(--warnung);
+}
+
+.retro-text {
+  resize: vertical;
+  min-height: 8rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}

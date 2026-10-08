@@ -1,0 +1,17 @@
+{
+  "name": "packliste",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Aus einem festen Item-Katalog und einem beschriebenen Reise-Profil wird automatisch eine vollständige Packliste.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test tests/",
+    "katalog": "node import/import.mjs --write"
+  },
+  "devDependencies": {
+    "vite": "^5.4.10"
+  }
+}

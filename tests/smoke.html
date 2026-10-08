@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <title>smoke</title>
+  </head>
+  <body>
+    <main id="app"></main>
+    <pre id="ergebnis">läuft …</pre>
+
+    <!-- Klassisches Skript: läuft VOR den Modulen (Module sind deferred).
+         Nur so ist localStorage befüllt, bevor main.js startet. -->
+    <script>
+      window.__fehler = [];
+      window.addEventListener('error', (e) => window.__fehler.push('error: ' + e.message));
+      window.addEventListener('unhandledrejection', (e) =>
+        window.__fehler.push('rejection: ' + (e.reason?.message || e.reason))
+      );
+    </script>
+
+    <script type="module">
+      /**
+       * Rauchtest im echten Browser. Klickt sich durch alle fünf Ansichten, so
+       * wie eine Nutzerin es täte — über die Knöpfe, nicht über die Engine.
+       *
+       * Zwei Durchläufe: der erste mit Katalog, der zweite (nach location.reload)
+       * ohne, um den leeren Zustand zu prüfen (FR19).
+       */
+      const zeilen = [];
+      const pruefe = (name, ok, zusatz = '') => zeilen.push(`${ok ? 'ok  ' : 'FEHL'} ${name}${zusatz ? ' — ' + zusatz : ''}`);
+      const warte = () => new Promise((r) => setTimeout(r, 80));
+
+      /**
+       * Warten, bis eine Bedingung eintritt — nicht einfach eine feste Zeit.
+       * Das Lesen einer Datei ist echt asynchron; unter Chromes virtueller Zeit
+       * laufen setTimeout-Ticks schneller als die Datei-API, und feste Wartezeiten
+       * machen den Test dadurch zufällig.
+       */
+      const warteAuf = async (bedingung, versuche = 80) => {
+        for (let i = 0; i < versuche; i++) {
+          if (bedingung()) return true;
+          await new Promise((r) => setTimeout(r, 50));
+        }
+        return false;
+      };
+      const knopfMit = (app, text) => [...app.querySelectorAll('button,a')].find((b) => b.textContent.trim().startsWith(text));
+
+      const durchgang = sessionStorage.getItem('smoke-durchgang') ?? '1';
+
+      if (durchgang === '1') {
+        const katalog = await (await fetch('/daten/katalog.json')).json();
+
+        const reise = {
+          id: 'smoke-1',
+          name: 'Rauchtest Ägypten',
+          ziel: 'Hurghada',
+          von: '2026-10-01',
+          bis: '2026-10-10',
+          saison: 'Sommer',
+          aktivitaeten: ['Tauchen', 'Schnorcheln'],
+          verkehrsmittel: 'Flugzeug',
+          unterkunft: 'Ferienwohnung',
+          zusatz_tags: ['Regen'],
+          entfernte_tags: [],
+          retro: '',
+        };
+
+        localStorage.setItem('packliste.katalog', JSON.stringify(katalog));
+        localStorage.setItem('packliste.reisen', JSON.stringify({ version: 1, reisen: [reise], packlisten: [] }));
+
+        await import('/src/main.js');
+        await warte();
+
+        const app = document.getElementById('app');
+        const text = () => app.textContent;
+        const reihen = () => app.querySelectorAll('.pos-liste .pos');
+
+        /* 1 — Startansicht */
+        pruefe('Startansicht rendert die Reise', text().includes('Rauchtest Ägypten'));
+        pruefe('Kopfzeile zeigt die Item-Zahl', text().includes(String(katalog.items.length)));
+
+        /* 2 — Liste erzeugen, über den Knopf */
+        location.hash = '#/liste/smoke-1';
+        await warte();
+        const erzeugen = knopfMit(app, 'Liste erzeugen');
+        pruefe('Knopf „Liste erzeugen" vorhanden', Boolean(erzeugen));
+        erzeugen?.click();
+        await warte();
+
+        pruefe('Liste rendert Positionen', reihen().length > 50, `${reihen().length} Positionen`);
+        pruefe('Fortschritt wird angezeigt', /\d+ von \d+ gepackt/.test(text()));
+        const kategorien = [...app.querySelectorAll('.kategorie-titel')].map((k) => k.firstChild.textContent);
+        pruefe('Kategorien in Anhang-B.1-Reihenfolge', kategorien[0] === 'Dokumente & Wertsachen', kategorien.slice(0, 3).join(' | '));
+        pruefe('keine leeren Kategorien', kategorien.length === [...new Set(kategorien)].length);
+
+        /* 3 — Abhaken (US-06): die ZWEITE Position, damit sie später nicht
+               durch das Entfernen der ersten wieder verschwindet */
+        app.querySelectorAll('.haken')[1].click();
+        await warte();
+        pruefe('Häkchen setzt ist-gepackt', app.querySelectorAll('.pos')[1].classList.contains('ist-gepackt'));
+        pruefe('Fortschritt zählt hoch', text().includes('1 von'));
+
+        /* 4 — Menge ändern (US-05) */
+        const mengeVon = (i) => Number(app.querySelectorAll('.menge')[i].value);
+        const vorher = mengeVon(1);
+        const plus = [...app.querySelectorAll('.schritt')].filter((b) => b.textContent === '+')[1];
+        plus.click();
+        await warte();
+        pruefe('Menge +1', mengeVon(1) === vorher + 1, `${vorher} -> ${mengeVon(1)}`);
+        pruefe('Änderung als solche markiert', text().includes('Menge geändert'));
+
+        /* 5 — Item entfernen (US-05), Katalog bleibt unangetastet */
+        const vorAnzahl = reihen().length;
+        app.querySelectorAll('.pos-weg')[0].click();
+        await warte();
+        pruefe('Item entfernt', reihen().length === vorAnzahl - 1);
+        pruefe('Katalog unverändert', JSON.parse(localStorage.getItem('packliste.katalog')).items.length === katalog.items.length);
+
+        /* 6 — Suche und Item von Hand hinzufügen (US-05).
+               Gesucht wird ein Item, das NICHT auf der Liste steht — sonst
+               filtert die Suche es korrekterweise heraus. */
+        const gerendert = new Set([...app.querySelectorAll('.pos-name')].map((e) => e.textContent));
+        const nichtAufListe = katalog.items.find((i) => !gerendert.has(i.name));
+        pruefe('es gibt Items außerhalb der Liste', Boolean(nichtAufListe), nichtAufListe?.name);
+
+        const suche = app.querySelector('.suche');
+        suche.value = nichtAufListe.name;
+        suche.dispatchEvent(new Event('input'));
+        await warte();
+        const treffer = [...app.querySelectorAll('.pos-hinzufuegen')];
+        pruefe('Suche findet das Item', treffer.length > 0, `${treffer.length} Treffer für "${nichtAufListe.name}"`);
+        const vorHand = reihen().length;
+        treffer[0]?.click();
+        await warte();
+        pruefe('Position hinzugefügt', reihen().length === vorHand + 1, `${vorHand} -> ${reihen().length}`);
+        pruefe('als „von Hand" markiert', text().includes('von Hand'));
+        pruefe('Suche bleibt gefüllt', app.querySelector('.suche').value === nichtAufListe.name);
+        pruefe(
+          'hinzugefügtes Item steht in der Liste',
+          [...app.querySelectorAll('.pos-name')].some((e) => e.textContent === nichtAufListe.name)
+        );
+
+        /* 7 — Nur Ungepackte (US-07) */
+        const nurOffen = knopfMit(app, 'nur Ungepackte');
+        nurOffen.click();
+        await warte();
+        pruefe('gepackte Position ausgeblendet', !app.querySelector('.pos.ist-gepackt'));
+        nurOffen.click();
+        await warte();
+        pruefe('wieder alle sichtbar', Boolean(app.querySelector('.pos.ist-gepackt')));
+
+        /* 8 — Formular mit Tag-Ableitung (US-03, F8, F9) */
+        location.hash = '#/reise/smoke-1';
+        await warte();
+        pruefe('Formular öffnet', text().includes('Reise bearbeiten'));
+        pruefe('Reisetage berechnet', text().includes('10 Tage'));
+        pruefe('abgeleitete Tags sichtbar', text().includes('Ferienwohnung'));
+        pruefe('Zusatz-Tag als eigener Chip', Boolean(app.querySelector('.chip-eigen')));
+        const schalter = [...app.querySelectorAll('.chip-schalter')];
+        pruefe('Saison-Schalter vorhanden', schalter.length > 10);
+
+        // neuen Tag eintippen (F8)
+        const frei = [...app.querySelectorAll('.freitext input')].at(-1);
+        frei.value = 'Tropen';
+        frei.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        await warte();
+        pruefe('neuer Tag angelegt', [...app.querySelectorAll('.chip-eigen')].some((c) => c.textContent.includes('Tropen')));
+        pruefe('neuer Tag wirkt in den Reise-Tags', [...app.querySelectorAll('.chip-ruhig')].some((c) => c.textContent === 'Tropen'));
+
+        /* 9 — Katalogansicht (US-09, US-10) */
+        location.hash = '#/katalog';
+        await warte();
+        pruefe('Katalogansicht zeigt Kennzahlen', text().includes(String(katalog.items.length)));
+        pruefe('Katalog-Abdeckung benannt', text().includes('Katalog-Abdeckung'));
+        pruefe('Reisen exportierbar', text().includes('Reisen exportieren'));
+
+        /* 10 — Retro (US-08) */
+        location.hash = '#/retro/smoke-1';
+        await warte();
+        pruefe('Retro öffnet', text().includes('Was hat gefehlt?'));
+        const feld = app.querySelector('.retro-text');
+        feld.value = 'Blasenpflaster gefehlt';
+        feld.dispatchEvent(new Event('input'));
+        knopfMit(app, 'Speichern').click();
+        await warte();
+        const retro = JSON.parse(localStorage.getItem('packliste.reisen')).reisen[0].retro;
+        pruefe('Retro wird gespeichert', retro === 'Blasenpflaster gefehlt', JSON.stringify(retro));
+
+        /* Durchgang 2 vorbereiten: ohne Katalog neu laden */
+        sessionStorage.setItem('smoke-ergebnis', JSON.stringify(zeilen));
+        sessionStorage.setItem('smoke-durchgang', '2');
+        localStorage.removeItem('packliste.katalog');
+        location.hash = '#/';
+        location.reload();
+      } else {
+        /* Durchgang 2 — leerer Zustand (FR19) und Datei-Import (US-09) */
+        sessionStorage.removeItem('smoke-durchgang');
+        const katalog = await (await fetch('/daten/katalog.json')).json();
+
+        await import('/src/main.js');
+        await warte();
+
+        const app = document.getElementById('app');
+        const text = () => app.textContent;
+
+        pruefe('FR19: ohne Katalog kommt die Import-Aufforderung', text().includes('Kein Katalog auf diesem Gerät'));
+        pruefe('FR19: kein leerer Listenbildschirm', !text().includes('Meine Reisen'));
+        pruefe('Import-Knopf ist da', Boolean(knopfMit(app, 'Katalog auswählen')));
+
+        /* Katalogansicht muss auch ohne Katalog funktionieren — sie ist der
+           Rückweg nach einer Räumung des Script-Storage. */
+        location.hash = '#/katalog';
+        await warte();
+        pruefe('Katalogansicht ohne Katalog erreichbar', text().includes('Kein Katalog auf diesem Gerät'));
+        pruefe('Import dort ebenfalls möglich', Boolean(knopfMit(app, 'Katalog auswählen')));
+
+        /* US-09 im echten Browser: eine Datei durch die Dateiauswahl schicken */
+        /**
+         * Eine Datei durch die echte Dateiauswahl schicken.
+         *
+         * Mit Wiederholung, weil die Ansicht bei jedem Render neu aufgebaut wird
+         * und der Test sonst auf ein gerade ausgetauschtes Eingabefeld schreiben
+         * kann — der Klick ginge dann ins Leere. Die Wiederholung macht den Test
+         * unabhängig davon; sie verdeckt keinen Fehler in der App, denn ob eine
+         * Datei angenommen oder abgelehnt wird, entscheidet allein der Code.
+         */
+        const waehle = async (inhalt, name, erwartet) => {
+          for (let i = 0; i < 20; i++) {
+            const feld = app.querySelector('.datei-waehler input[type=file]');
+            if (feld) {
+              const dt = new DataTransfer();
+              dt.items.add(new File([inhalt], name, { type: 'application/json' }));
+              feld.files = dt.files;
+              if (feld.files.length === 1) {
+                feld.dispatchEvent(new Event('change', { bubbles: true }));
+                if (await warteAuf(() => erwartet(text()), 40)) return true;
+              }
+            }
+            await new Promise((r) => setTimeout(r, 50));
+          }
+          return false;
+        };
+
+        pruefe(
+          'US-09: ungültige Datei wird abgelehnt',
+          await waehle('{"version":1,"items":[{"id":"x"}]}', 'kaputt.json', (t) => t.includes('nicht übernommen'))
+        );
+        pruefe('US-09: Fehler werden benannt', text().includes('name fehlt'));
+        pruefe('US-09: bestehender Bestand bleibt unangetastet', localStorage.getItem('packliste.katalog') === null);
+
+        pruefe(
+          'US-09: Nicht-JSON wird abgelehnt',
+          await waehle('kein json', 'keinjson.json', (t) => t.includes('keine gültige JSON-Datei'))
+        );
+
+        pruefe(
+          'US-09: gültiger Katalog wird übernommen',
+          await waehle(JSON.stringify(katalog), 'katalog.json', (t) => t.includes('Katalog übernommen'))
+        );
+        pruefe('US-09: Katalog liegt im Speicher', localStorage.getItem('packliste.katalog') !== null);
+        pruefe('US-09: Item-Zahl und Regeln werden bestätigt', text().includes(String(katalog.items.length)));
+
+        /* Reisen waren die ganze Zeit da und sind jetzt wieder sichtbar */
+        location.hash = '#/';
+        await warte();
+        pruefe('nach dem Import zeigt die Übersicht die Reise', text().includes('Rauchtest Ägypten'));
+
+        /* FR14: Reise duplizieren */
+        const vorherAnzahl = JSON.parse(localStorage.getItem('packliste.reisen')).reisen.length;
+        knopfMit(app, 'Duplizieren').click();
+        await warte();
+        const nachher = JSON.parse(localStorage.getItem('packliste.reisen')).reisen;
+        pruefe('FR14: Reise dupliziert', nachher.length === vorherAnzahl + 1, `${vorherAnzahl} -> ${nachher.length}`);
+        pruefe('FR14: Kopie ist benannt', text().includes('(Kopie)'));
+        pruefe('FR14: Kopie öffnet das Formular', text().includes('Neue Reise') || text().includes('Reise bearbeiten'));
+
+        const vorher = JSON.parse(sessionStorage.getItem('smoke-ergebnis') ?? '[]');
+        const alle = [...vorher, ...zeilen];
+
+        const fehler = window.__fehler;
+        const offen = alle.filter((z) => z.startsWith('FEHL')).length;
+        const kopf = `${alle.length - offen}/${alle.length} ok · ${offen} fehlgeschlagen · ${fehler.length} JS-Fehler`;
+        document.title = offen === 0 && fehler.length === 0 ? 'SMOKE-OK' : 'SMOKE-FEHLER';
+        document.getElementById('ergebnis').textContent = [kopf, '', ...alle, '', ...fehler.map((f) => 'JS ' + f)].join('\n');
+      }
+    </script>
+  </body>
+</html>

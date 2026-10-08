@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <!-- Handy zuerst: die App ist im MVP ein Handy-Werkzeug (PRD §3.6).
+         viewport-fit=cover wegen der Notch, kein Zoom-Sperren (Barrierefreiheit). -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="description" content="Packliste — aus Katalog und Reise-Profil wird automatisch eine fertige Packliste." />
+    <!-- Keine Telemetrie, keine externen Aufrufe (PRD §9) -->
+    <title>Packliste</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧳</text></svg>" />
+    <script type="module" src="/src/main.js"></script>
+  </head>
+  <body>
+    <main id="app" class="inhalt">
+      <p class="lade-hinweis">Lädt …</p>
+    </main>
+    <noscript>
+      <p>Diese App braucht JavaScript. Ohne läuft nichts — es gibt keinen Server, der etwas vorrechnen könnte.</p>
+    </noscript>
+  </body>
+</html>
