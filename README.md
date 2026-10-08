@@ -44,6 +44,8 @@ tests/
   fixtures/
     katalog.synthetisch.json   erfundener Katalog: alle 11 Kategorien, alle 3 Regeln
   smoke.html      Rauchtest im echten Browser (siehe unten)
+vite.config.js    base für den Pages-Pfad, nur beim Bauen gesetzt
+.github/workflows/deploy.yml   baut, testet und veröffentlicht auf GitHub Pages
 ```
 
 **Der echte Katalog liegt nicht in diesem Repo**, sondern im privaten
@@ -188,11 +190,26 @@ Damit eine Änderung am Handy ankommt: committen und pushen, dann in der App
 
 ## Deployment
 
-Statisch gehostet (Vercel erkennt Vite und liefert `dist/` aus). Das Deployment
-enthält **nur die App-Hülle** — kein Katalog, keine Reisen. Die Deploy-URL darf
-deshalb öffentlich sein.
+**GitHub Pages**, gebaut von `.github/workflows/deploy.yml` bei jedem Push auf
+`main`: <https://vernaldaylight.github.io/packliste/>. Der Workflow lässt vorher
+`npm test` laufen — fällt ein Test, wird nicht veröffentlicht.
+
+Das Deployment enthält **nur die App-Hülle** — kein Katalog, keine Reisen. Die URL
+darf deshalb öffentlich sein.
+
+Zwei Eigenheiten, die man beim Nachbauen kennen muss:
+
+- **`base` in `vite.config.js`.** Eine Projekt-Seite liegt unter `/packliste/`, nicht
+  an der Wurzel. Ohne `base` zeigen alle Asset-Pfade ins Leere und die Seite bleibt
+  weiß — der häufigste Grund, warum ein Pages-Deploy „nichts tut". Gesetzt wird es
+  **nur beim Bauen**, damit Entwicklungsserver, Rauchtest und die absoluten
+  Fixture-Pfade unverändert bleiben.
+- **Hash-Routing statt History-API.** `#/liste/xyz` sieht der Server nie, also
+  braucht es keine `404.html`-Krücke für Deep-Links.
+
+Was wirklich ausgeliefert wird, prüft man mit `npm run preview` — das liefert `dist/`
+unter demselben `/packliste/`-Pfad aus wie Pages.
 
 Katalog und `import/` liegen aus genau diesem Grund in einem **eigenen privaten
 Repo** und nicht hier: ein einmal veröffentlichter Stand wäre über Forks, Caches und
-Archive nicht mehr zurückzuholen. Der Build selbst hat damit nichts zu tun — Vite
-sieht die Dateien gar nicht mehr.
+Archive nicht mehr zurückzuholen. Der Build sieht die Dateien gar nicht mehr.

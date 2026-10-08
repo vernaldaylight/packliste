@@ -1,7 +1,7 @@
 # Packliste — Product Requirements Document
 
-**Version**: 1.2
-**Datum**: 2026-10-07
+**Version**: 1.8
+**Datum**: 2026-10-08
 **Autor**: Sarah
 **Status**: Abgestimmt — bereit für die Umsetzung. Technische Architektur entschieden (§3.6). Der Katalog-Editor ist aus dem MVP in die erste Überarbeitung verschoben (FF-16).
 **Sprache der App**: Deutsch
@@ -151,7 +151,7 @@ Die App hat genau zwei Aufgaben, die man auslagern *könnte*: **Persistenz** und
 
 | Baustein | Entscheidung | Begründung |
 |---|---|---|
-| Auslieferung | Statisch gehostet (**Vercel**), kein Backend-Prozess | Reine Browser-App. Vercel erkennt Vite und liefert `dist/` aus — kostenlos, HTTPS, URL fürs Handy. Kein Laptop muss dafür laufen |
+| Auslieferung | Statisch gehostet (**GitHub Pages**), kein Backend-Prozess | Reine Browser-App. Ein Workflow baut und veröffentlicht `dist/` — kostenlos, HTTPS, URL fürs Handy. Kein Laptop muss dafür laufen. Die App routet über `location.hash`, deshalb braucht Pages keine `404.html`-Krücke für Deep-Links |
 | Build | **Vite** | Dev-Server mit Hot-Reload plus Bundler, ohne Framework-Zwang |
 | UI | **Vanilla JS** | Die Engine ist eine reine Funktion, der Rest ist Formular- und Listen-Handling über fünf Ansichten. Ein UI-Framework wäre hier Ballast |
 | **Inhalt des Deployments** | **Nur die App-Hülle** — kein Katalog, keine Reisen | Die Deploy-URL ist damit öffentlich und trotzdem unbedenklich: sie enthält nichts Persönliches (O11) |
@@ -838,6 +838,7 @@ Dabei entstehen zwei Lücken, die der Import-Report (F7) ausweisen muss:
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 1.8 | 2026-10-08 | **Auslieferung von Vercel auf GitHub Pages umgestellt.** Vercel lieferte unter der Projekt-Domain eine fremde Next.js-App aus, während die eigenen Deployments seit Stunden als „blocked" scheiterten — der Wirt war nicht mehr nachvollziehbar. Pages liegt im selben Repo wie der Code, das Deployment steht als Datei darin statt in einem Dashboard. Zwei Eigenheiten, die dabei zu beachten sind: Projekt-Seiten liegen unter `/packliste/`, deshalb setzt `vite.config.js` ein `base` — **nur beim Bauen**, damit Entwicklungsserver, Rauchtest und die absoluten Fixture-Pfade unverändert bleiben. Und weil die App über `location.hash` routet, braucht es keine `404.html`-Krücke für Deep-Links. Kopfzeile dieses Dokuments von 1.2 auf den Stand der Historie gezogen |
 | 1.7 | 2026-10-08 | **Zwei Repos statt einem.** Das App-Repo wird öffentlich und enthält nur noch die Hülle; Katalog und `import/` ziehen in ein **privates** Daten-Repo, weil der Katalog Gesundheitsdaten enthält (Medikamentennamen) und `mapping.json` echte Item-Namen — ein einmal veröffentlichter Stand ist nicht zurückzuholen. Datentransfer um **US-11** ergänzt: Abgleich über die GitHub-Contents-API auf Knopfdruck, fein granuliertes PAT nur im `localStorage`. Der Katalog geht nur noch **eine** Richtung (App liest, schreibt nie); Reisen gehen hoch und werden ausdrücklich geholt. Konflikte erkennt die `sha` der Contents-API — **keine** Merge-Regel, kein Zeitstempel im Datenmodell (O12, O13). `localStorage` ist jetzt ausdrücklich Arbeitskopie statt Master; der Sync blockiert nie. Neuer §4.5, FR20–FR24, F15, §9 um Geheimnis und Offline erweitert, §11 um Token, Konflikt und Veröffentlichung. O11 von „Schutz erübrigt sich" auf „privates Repo" korrigiert. Der Secret-Gist-Weg und ein API-Proxy sind als verworfen dokumentiert. Tests: erfundener Fixture-Katalog im öffentlichen Repo, der echte Katalog wird zusätzlich getestet, wenn er lokal liegt |
 | 1.6 | 2026-10-08 | Tags aufgeräumt. Neuer Tag **`UW-Fotografie`** in Anhang B.2 (Gruppe **Aktivität**): Unterwasser-Foto-Gerät (Gehäuse, Box, Auftriebskörper, Glasfaserkabel, Kleinteile, UW-Kamera, Ladegerät) hing an `Tauchen`, während Kamera und Zubehör an `Fotografie` hingen — auf einer Tauchreise kam so das Gehäuse ohne Kamera mit. Jetzt trägt das reine UW-Gerät nur `UW-Fotografie`; Kamera, SD Karte, Festplatte, Blitz, Arme, Diffusor, Fisheye, Schellen, GoPro und das Ladegerät der Kamera tragen beides und kommen auf Land- wie UW-Fotoreisen. `Flugzeug` war mit einem einzigen Item leer: `Nackenkissen` und ein Beutel (**Allgemein** weg, sie kommen nur auf Flugreisen mit), `Wollsocken` und `Sonnencreme` tragen es zusätzlich (PRD §4.3, §5.2). `Handtuch` verliert `Allgemein` (schickte es auch ins Hotel, das laut B.2 keins braucht) und hängt jetzt an `Strand`/`Camping`/`Ferienwohnung`/`Hostel`. `Ohrstöpsel` von `Allgemein` auf `Hostel`/`Camping`. Wirkungslose Doppel-Tags entfernt, wo `Allgemein` schon alles abdeckt (`Hausschuhe`, `Taschentücher`, `Wasserbehälter`). `Poncho` zusätzlich an `Strand`. Die fünf Kleidungsstücke mit `Tauchen` bleiben als Trocki-Unterzeug — PRD §6.2 verlangt hier bewusst Handarbeit, kein Automatismus |
 | 1.5 | 2026-10-08 | Neuer Tag `Reiseapotheke` in Anhang B.2 (Gruppe **Basis**). Die Kategorie `Medizin` hängt nicht mehr an `Allgemein`: ihre 47 Items trugen ein Drittel jeder Packliste bei und kommen jetzt nur noch mit, wenn der Tag gewählt wird. Die Actionkamera verliert `Sport` und hängt an `Fotografie`, das Sportoberteil an `Allgemein`. `mapping.json` und `erwartungen.json` bleiben bewusst auf ihrem Stand — sie beschreiben den Lauf des stillgelegten Imports, nicht mehr den Katalog, und können Löschungen und Umbenennungen ohnehin nicht abbilden. Sie sind ab jetzt historisch |
