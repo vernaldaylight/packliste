@@ -33,17 +33,29 @@ import {
 
 const HIER = dirname(fileURLToPath(import.meta.url));
 
-/** Gibt `null` zurück, wenn die private Arbeitskopie fehlt — statt beim Import zu werfen. */
+/**
+ * Die private Arbeitskopie, falls sie auf dieser Maschine liegt — sonst `null`,
+ * statt beim Import zu werfen. Gesucht wird an beiden Stellen, an denen sie
+ * vorkommt: das alte Layout im App-Repo und der Arbeitsklon des Daten-Repos
+ * daneben. Fehlt sie, geben die abhängigen Tests sich selbst auf.
+ */
 function ladeEchtenKatalog() {
-  try {
-    return JSON.parse(readFileSync(resolve(HIER, '../daten/katalog.json'), 'utf8'));
-  } catch {
-    return null;
+  const kandidaten = [
+    resolve(HIER, '../daten/katalog.json'),
+    resolve(HIER, '../../packliste-daten/katalog.json'),
+  ];
+  for (const pfad of kandidaten) {
+    try {
+      return JSON.parse(readFileSync(pfad, 'utf8'));
+    } catch {
+      /* nächster Kandidat */
+    }
   }
+  return null;
 }
 
 const katalog = ladeEchtenKatalog();
-const nurMitEchtemKatalog = katalog ? false : 'daten/katalog.json liegt hier nicht (privates Repo, PRD §4.5)';
+const nurMitEchtemKatalog = katalog ? false : 'keine private Arbeitskopie gefunden (Daten-Repo packliste-daten, PRD §4.5)';
 
 /* --- Reisetage ------------------------------------------------------------- */
 

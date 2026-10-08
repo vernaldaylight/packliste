@@ -4,16 +4,9 @@
 # macOS
 .DS_Store
 
-# Quelldateien: privater Bestand, nicht versionieren.
-# Der Import liest sie nur; erzeugt wird katalog.json.
-quellen/
-
-# Import-Artefakte: jederzeit neu erzeugbar.
-import/import-report.md
-import/backup-katalog-*.json
-
-# katalog.json wird bewusst NICHT ignoriert (PRD §4.5):
-# es ist der einzige Teil, dessen Verlust echte Arbeit kostet.
+# Der Katalog, die Rohquellen und die Import-Werkzeuge liegen nicht hier,
+# sondern im privaten Repo `packliste-daten` (PRD §4.5). Es gibt hier nichts
+# zu ignorieren — und nichts, was versehentlich hineingeraten könnte.
 
 # Build und Abhängigkeiten
 node_modules/

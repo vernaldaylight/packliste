@@ -44,17 +44,17 @@ tests/
   fixtures/
     katalog.synthetisch.json   erfundener Katalog: alle 11 Kategorien, alle 3 Regeln
   smoke.html      Rauchtest im echten Browser (siehe unten)
-quellen/        private Excel-Quellen — nicht versioniert
 ```
 
 **Der echte Katalog liegt nicht in diesem Repo**, sondern im privaten
 `packliste-daten` — er nennt Medikamente und ist nichts für ein öffentliches Repo.
-`daten/` und `import/` sind mit ihm dorthin gezogen.
+`katalog.json`, die Rohquellen und die Import-Werkzeuge sind mit ihm zusammen
+dorthin gezogen; hier gibt es sie nicht mehr.
 
 Die Tests laufen deshalb gegen einen **erfundenen** Katalog in `tests/fixtures/`.
 Der prüft die Struktur (elf Kategorien, drei Mengenregeln, Sortierung), nicht die
-echten Item-Namen. Liegt `daten/katalog.json` lokal noch vor, laufen zusätzlich die
-Tests gegen den echten Katalog; fehlt er, überspringen die sich selbst.
+echten Item-Namen. Liegt `katalog.json` aus dem Daten-Repo daneben, laufen
+zusätzlich die Tests gegen den echten Katalog; fehlt er, überspringen die sich selbst.
 
 ## Die Auswahllogik
 
@@ -163,6 +163,9 @@ Also dort klonen, nicht hier:
 ```bash
 git clone git@github.com:<du>/packliste-daten.git
 ```
+
+Dort liegen auch die Rohquellen (`quellen/`) und die Import-Werkzeuge (`import/`).
+Der Import läuft entsprechend **im Daten-Repo**, nicht in diesem:
 
 **`katalog.json` wird von Hand gepflegt.** Der Excel-Import ist einmal gelaufen und
 danach totgelegt: `mapping.json` und `import.mjs` kennen nur die Quelltabelle und

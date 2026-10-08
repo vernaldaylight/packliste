@@ -66,15 +66,22 @@ const katalogRoh = JSON.parse(readFileSync(resolve(HIER, 'fixtures/katalog.synth
 
 /** Die private Arbeitskopie am Mac, falls vorhanden — sonst `null`. */
 function ladeEchtenKatalog() {
-  try {
-    return JSON.parse(readFileSync(resolve(HIER, '../daten/katalog.json'), 'utf8'));
-  } catch {
-    return null;
+  const kandidaten = [
+    resolve(HIER, '../daten/katalog.json'),
+    resolve(HIER, '../../packliste-daten/katalog.json'),
+  ];
+  for (const pfad of kandidaten) {
+    try {
+      return JSON.parse(readFileSync(pfad, 'utf8'));
+    } catch {
+      /* nächster Kandidat */
+    }
   }
+  return null;
 }
 
 const echterKatalog = ladeEchtenKatalog();
-const nurMitEchtemKatalog = echterKatalog ? false : 'daten/katalog.json liegt hier nicht (privates Repo, PRD §4.5)';
+const nurMitEchtemKatalog = echterKatalog ? false : 'keine private Arbeitskopie gefunden (Daten-Repo packliste-daten, PRD §4.5)';
 
 beforeEach(() => {
   globalThis.localStorage = baueSpeicher();
