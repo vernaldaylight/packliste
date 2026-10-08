@@ -3,9 +3,12 @@
  *
  * Zwei Ebenen:
  *  1. Synthetische Fälle — jede Regel der PRD einzeln, inklusive der Beispiele
- *     aus §5.2 und §4.2.
- *  2. Der echte Katalog (`daten/katalog.json`, 262 Items) — die Engine muss
- *     gegen die echten Daten laufen, nicht nur gegen Spielzeug (PRD §3.5).
+ *     aus §5.2 und §4.2. Sie bringen ihren eigenen Katalog mit und laufen immer.
+ *  2. Der echte Katalog — die Engine muss gegen die echten Daten laufen, nicht
+ *     nur gegen Spielzeug (PRD §3.5). Er liegt seit dem Umzug in einem privaten
+ *     Repo (PRD §4.5) und ist im öffentlichen Repo nicht mehr vorhanden; fehlt
+ *     er, überspringen sich diese Tests selbst. Auf dem Mac mit einer lokalen
+ *     Arbeitskopie laufen sie weiter.
  *
  * Lauf: npm test
  */
@@ -29,7 +32,18 @@ import {
 } from '../src/engine.js';
 
 const HIER = dirname(fileURLToPath(import.meta.url));
-const katalog = JSON.parse(readFileSync(resolve(HIER, '../daten/katalog.json'), 'utf8'));
+
+/** Gibt `null` zurück, wenn die private Arbeitskopie fehlt — statt beim Import zu werfen. */
+function ladeEchtenKatalog() {
+  try {
+    return JSON.parse(readFileSync(resolve(HIER, '../daten/katalog.json'), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+const katalog = ladeEchtenKatalog();
+const nurMitEchtemKatalog = katalog ? false : 'daten/katalog.json liegt hier nicht (privates Repo, PRD §4.5)';
 
 /* --- Reisetage ------------------------------------------------------------- */
 
@@ -285,8 +299,9 @@ test('alsMarkdown kann auf ungepackte Positionen eingrenzen (US-07)', () => {
 });
 
 /* --- Der echte Katalog (PRD §3.5: "Fertig, wenn ...") ---------------------- */
+/* Überspringt sich, wenn die private Arbeitskopie fehlt (siehe Kopf). */
 
-test('echter Katalog: Struktur und Vokabular stimmen (PRD §4.1, Anhang B.1)', () => {
+test('echter Katalog: Struktur und Vokabular stimmen (PRD §4.1, Anhang B.1)', { skip: nurMitEchtemKatalog }, () => {
   assert.ok(Array.isArray(katalog.items));
   assert.ok(katalog.items.length > 200, `nur ${katalog.items.length} Items`);
   assert.equal(typeof katalog.version, 'number');
@@ -305,7 +320,7 @@ test('echter Katalog: Struktur und Vokabular stimmen (PRD §4.1, Anhang B.1)', (
   }
 });
 
-test('echter Katalog: jede Reise erzeugt eine vollständige Liste', () => {
+test('echter Katalog: jede Reise erzeugt eine vollständige Liste', { skip: nurMitEchtemKatalog }, () => {
   const reise = {
     id: 'echt',
     name: 'Tauchurlaub Ägypten',
@@ -335,7 +350,7 @@ test('echter Katalog: jede Reise erzeugt eine vollständige Liste', () => {
   }
 });
 
-test('echter Katalog: Winterreise und Sommerreise unterscheiden sich', () => {
+test('echter Katalog: Winterreise und Sommerreise unterscheiden sich', { skip: nurMitEchtemKatalog }, () => {
   const basis = { id: 'x', von: '2026-02-01', bis: '2026-02-07', aktivitaeten: [], unterkunft: 'Hotel', verkehrsmittel: 'Zug' };
   const winter = erzeugePackliste(katalog, { ...basis, saison: 'Winter' });
   const sommer = erzeugePackliste(katalog, { ...basis, saison: 'Sommer' });
@@ -350,7 +365,7 @@ test('echter Katalog: Winterreise und Sommerreise unterscheiden sich', () => {
   assert.ok(nurSommer.length > 0, 'Sommer muss eigene Items haben');
 });
 
-test('echter Katalog: keine Reise liefert eine leere Liste', () => {
+test('echter Katalog: keine Reise liefert eine leere Liste', { skip: nurMitEchtemKatalog }, () => {
   // Die Untergrenze ist bewusst grob: sie soll fangen, dass `Allgemein` gar nicht
   // mehr greift, nicht die genaue Item-Zahl festschreiben. Seit dem Medizin-Tag
   // (Reiseapotheke, 47 Items) liegt der Grundstock einer reinen Saisonreise bei 88 —
@@ -361,7 +376,7 @@ test('echter Katalog: keine Reise liefert eine leere Liste', () => {
   }
 });
 
-test('Performance: 262 Items in deutlich unter 200 ms (PRD §9)', () => {
+test('Performance: 262 Items in deutlich unter 200 ms (PRD §9)', { skip: nurMitEchtemKatalog }, () => {
   const reise = { id: 'p', von: '2026-06-01', bis: '2026-06-14', saison: 'Sommer', aktivitaeten: ['Tauchen', 'Wandern'], verkehrsmittel: 'Flugzeug', unterkunft: 'Camping' };
   const start = performance.now();
   for (let i = 0; i < 100; i++) erzeugePackliste(katalog, reise);

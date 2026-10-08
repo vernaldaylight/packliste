@@ -48,7 +48,7 @@
       const durchgang = sessionStorage.getItem('smoke-durchgang') ?? '1';
 
       if (durchgang === '1') {
-        const katalog = await (await fetch('/daten/katalog.json')).json();
+        const katalog = await (await fetch('/tests/fixtures/katalog.synthetisch.json')).json();
 
         const reise = {
           id: 'smoke-1',
@@ -87,7 +87,9 @@
         erzeugen?.click();
         await warte();
 
-        pruefe('Liste rendert Positionen', reihen().length > 50, `${reihen().length} Positionen`);
+        // Der Fixture hat wenige Items; geprüft wird, dass die Liste einen
+        // erheblichen Teil davon rendert — nicht eine feste Positionenzahl.
+        pruefe('Liste rendert Positionen', reihen().length >= katalog.items.length / 2, `${reihen().length} Positionen von ${katalog.items.length} Items`);
         pruefe('Fortschritt wird angezeigt', /\d+ von \d+ gepackt/.test(text()));
         const kategorien = [...app.querySelectorAll('.kategorie-titel')].map((k) => k.firstChild.textContent);
         pruefe('Kategorien in Anhang-B.1-Reihenfolge', kategorien[0] === 'Dokumente & Wertsachen', kategorien.slice(0, 3).join(' | '));
@@ -174,6 +176,51 @@
         pruefe('Katalog-Abdeckung benannt', text().includes('Katalog-Abdeckung'));
         pruefe('Reisen exportierbar', text().includes('Reisen exportieren'));
 
+        /* 9b — Sync-Bedienung (PRD §4.5), ohne Netz: geprüft wird nur, was ohne
+           Repo und Token passieren muss. Der echte Sync läuft gegen GitHub. */
+        pruefe('Sync-Karte vorhanden', text().includes('Synchronisierung'));
+        pruefe('Sync-Knöpfe vorhanden', Boolean(knopfMit(app, 'Aus GitHub holen')) && Boolean(knopfMit(app, 'Hochschieben')));
+
+        // Ohne Token darf kein Klick ins Leere laufen — und es darf nichts rausgehen.
+        knopfMit(app, 'Aus GitHub holen')?.click();
+        await warte();
+        pruefe('Katalog holen ohne Token meldet das', text().includes('Erst Repo und Token'));
+        pruefe('ohne Token bleibt der Katalog', JSON.parse(localStorage.getItem('packliste.katalog')).items.length === katalog.items.length);
+
+        // Das Token liegt im Speicher, darf aber nie im DOM auftauchen.
+        localStorage.setItem('packliste.sync', JSON.stringify({ repo: 'owner/packliste-daten', token: 'TESTTOKEN-nur-fuer-den-Rauchtest' }));
+        location.hash = '#/';
+        await warte();
+        location.hash = '#/katalog';
+        await warte();
+        const tokenFeld = app.querySelector('input[type=password]');
+        pruefe('Token-Feld ist beim Rendern leer', tokenFeld?.value === '');
+        pruefe('Token steht nirgends im DOM', !app.innerHTML.includes('TESTTOKEN-nur-fuer-den-Rauchtest'));
+        pruefe('Token wird als hinterlegt gemeldet', text().includes('Token hinterlegt'));
+        pruefe('Repo wird angezeigt', app.querySelector('input[type=text]')?.value === 'owner/packliste-daten');
+
+        /* 9c — Der Ladezustand. Ein Sync sperrt die Knöpfe, solange er läuft.
+           Das Repo ist absichtlich falsch geformt: `istRepoName` lehnt es ab,
+           BEVOR irgendetwas rausgeht — der Test macht also keinen Netzaufruf.
+           Geprüft wird direkt nach dem Klick, ohne await: `lade()` rendert
+           synchron, bevor es auf die Aufgabe wartet. */
+        localStorage.setItem('packliste.sync', JSON.stringify({ repo: 'kein-schraegstrich', token: 'TESTTOKEN-nur-fuer-den-Rauchtest' }));
+        location.hash = '#/';
+        await warte();
+        location.hash = '#/katalog';
+        await warte();
+
+        pruefe('Sync-Knopf ist bereit', !knopfMit(app, 'Aus GitHub holen')?.disabled);
+        knopfMit(app, 'Aus GitHub holen').click();
+        pruefe('während des Syncs ist der Knopf gesperrt', Boolean(knopfMit(app, 'Aus GitHub holen')?.disabled));
+        pruefe('der Ladetext ist sichtbar', text().includes('wird geholt'));
+        await warte();
+        pruefe('nach dem Sync ist der Knopf wieder frei', !knopfMit(app, 'Aus GitHub holen')?.disabled);
+        pruefe('ungültiges Repo wird gemeldet', text().includes('Kein gültiges Repo'));
+        pruefe('ungültiges Repo lässt den Katalog stehen', JSON.parse(localStorage.getItem('packliste.katalog')).items.length === katalog.items.length);
+
+        localStorage.removeItem('packliste.sync');
+
         /* 10 — Retro (US-08) */
         location.hash = '#/retro/smoke-1';
         await warte();
@@ -195,7 +242,7 @@
       } else {
         /* Durchgang 2 — leerer Zustand (FR19) und Datei-Import (US-09) */
         sessionStorage.removeItem('smoke-durchgang');
-        const katalog = await (await fetch('/daten/katalog.json')).json();
+        const katalog = await (await fetch('/tests/fixtures/katalog.synthetisch.json')).json();
 
         await import('/src/main.js');
         await warte();

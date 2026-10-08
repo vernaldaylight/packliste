@@ -1,0 +1,176 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "badeschuhe",
+      "name": "Badeschuhe",
+      "kategorie": "Schuhe",
+      "tags": ["Allgemein"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": ["Wandern"],
+      "im_besitz": true
+    },
+    {
+      "id": "buch",
+      "name": "Buch",
+      "kategorie": "Haushalt & Sonstiges",
+      "tags": ["Allgemein"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
+      "id": "erste-hilfe-set",
+      "name": "Erste-Hilfe-Set",
+      "kategorie": "Medizin",
+      "tags": ["Allgemein"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
+      "id": "handschuhe",
+      "name": "Handschuhe",
+      "kategorie": "Kleidung",
+      "tags": ["Allgemein", "Winter"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
+      "id": "kissen",
+      "name": "Kissen",
+      "kategorie": "Campingausrüstung",
+      "tags": ["Camping"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
+      "id": "kulturbeutel",
+      "name": "Kulturbeutel",
+      "kategorie": "Taschen & Ordnung",
+      "tags": ["Allgemein"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
+      "id": "logbuch",
+      "name": "Logbuch",
+      "kategorie": "Tauchausrüstung",
+      "tags": ["Tauchen"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
+      "id": "muesliriegel",
+      "name": "Müsliriegel",
+      "kategorie": "Verpflegung",
+      "tags": ["Wandern"],
+      "menge": { "art": "pro_tage", "n": 1, "pro_tage": 2, "max": 5 },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
+      "id": "nackenkissen",
+      "name": "Nackenkissen",
+      "kategorie": "Haushalt & Sonstiges",
+      "tags": ["Flugzeug"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
+      "id": "reiseadapter",
+      "name": "Reiseadapter",
+      "kategorie": "Technik",
+      "tags": ["Allgemein"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
+      "id": "reisepass",
+      "name": "Reisepass",
+      "kategorie": "Dokumente & Wertsachen",
+      "tags": ["Allgemein"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
+      "id": "socken",
+      "name": "Socken",
+      "kategorie": "Kleidung",
+      "tags": ["Allgemein"],
+      "menge": { "art": "pro_tage", "n": 2, "pro_tage": 2, "max": 8 },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
+      "id": "t-shirt",
+      "name": "T-Shirt",
+      "kategorie": "Kleidung",
+      "tags": ["Allgemein"],
+      "menge": { "art": "pro_tage", "n": 1, "pro_tage": 3, "max": 6 },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
+      "id": "tauchhandschuhe",
+      "name": "Tauchhandschuhe",
+      "kategorie": "Tauchausrüstung",
+      "tags": ["Tauchen"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
+      "id": "uebergangsjacke",
+      "name": "Übergangsjacke",
+      "kategorie": "Kleidung",
+      "tags": ["Allgemein", "Übergangszeit"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": [],
+      "im_besitz": false
+    },
+    {
+      "id": "wanderstoecke",
+      "name": "Wanderstöcke",
+      "kategorie": "Campingausrüstung",
+      "tags": ["Wandern"],
+      "menge": { "art": "fest", "n": 2 },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
+      "id": "zahnbuerste",
+      "name": "Zahnbürste",
+      "kategorie": "Kosmetik & Pflege",
+      "tags": ["Allgemein"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
+      "id": "zahnpasta",
+      "name": "Zahnpasta",
+      "kategorie": "Kosmetik & Pflege",
+      "tags": ["Allgemein"],
+      "menge": { "art": "fest", "n": 1 },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
+      "id": "zelt",
+      "name": "Zelt",
+      "kategorie": "Campingausrüstung",
+      "tags": ["Camping"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": ["Hotel"],
+      "im_besitz": true
+    }
+  ]
+}

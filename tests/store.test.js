@@ -45,6 +45,7 @@ const {
   ladeDaten,
   speichereDaten,
   leereDaten,
+  fuegeReisenZusammen,
   neueId,
   SCHLUESSEL,
 } = await import('../src/store.js');
@@ -54,7 +55,26 @@ const { erzeugePackliste, gruppiere, alsMarkdown, neuePosition, fortschritt, tri
 );
 
 const HIER = dirname(fileURLToPath(import.meta.url));
-const katalogRoh = JSON.parse(readFileSync(resolve(HIER, '../daten/katalog.json'), 'utf8'));
+
+/**
+ * Prüfgegenstand ist der Fixture-Katalog: erfundene Items, aber alle elf
+ * Kategorien und alle drei Mengenregeln. Die Struktur-Tests brauchen einen
+ * gültigen Katalog, nicht die echten Item-Namen — der echte liegt seit dem
+ * Umzug in einem privaten Repo (PRD §4.5) und ist hier nicht mehr vorhanden.
+ */
+const katalogRoh = JSON.parse(readFileSync(resolve(HIER, 'fixtures/katalog.synthetisch.json'), 'utf8'));
+
+/** Die private Arbeitskopie am Mac, falls vorhanden — sonst `null`. */
+function ladeEchtenKatalog() {
+  try {
+    return JSON.parse(readFileSync(resolve(HIER, '../daten/katalog.json'), 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+const echterKatalog = ladeEchtenKatalog();
+const nurMitEchtemKatalog = echterKatalog ? false : 'daten/katalog.json liegt hier nicht (privates Repo, PRD §4.5)';
 
 beforeEach(() => {
   globalThis.localStorage = baueSpeicher();
@@ -62,7 +82,7 @@ beforeEach(() => {
 
 /* --- Katalog prüfen (US-09) ------------------------------------------------ */
 
-test('der echte katalog.json wird angenommen', () => {
+test('der Fixture-Katalog wird angenommen', () => {
   const p = validiereKatalog(katalogRoh);
   assert.ok(p.ok, `abgelehnt: ${p.fehler.join(' | ')}`);
   assert.equal(p.katalog.items.length, katalogRoh.items.length);
@@ -162,13 +182,31 @@ test('Katalog entfernen lässt das Backup stehen', () => {
 test('katalogStatistik zählt Kategorien, Tags und Regeln', () => {
   const s = katalogStatistik(validiereKatalog(katalogRoh).katalog);
   assert.equal(s.items, katalogRoh.items.length);
-  assert.equal(s.kategorien, 11, 'PRD Anhang B.1 friert elf Kategorien ein');
+
+  // Gegen die Erwartung aus dem Fixture gerechnet, nicht gegen eine feste Zahl —
+  // geprüft wird, DASS gezählt wird. Die PRD-Konformität des echten Katalogs
+  // prüft der Test weiter unten.
+  const erwarteteKategorien = new Set(katalogRoh.items.map((i) => i.kategorie)).size;
+  const erwarteteTags = new Set(katalogRoh.items.flatMap((i) => i.tags)).size;
+  assert.equal(s.kategorien, erwarteteKategorien);
+  assert.equal(s.tags, erwarteteTags);
+  assert.equal(erwarteteKategorien, 11, 'der Fixture deckt PRD Anhang B.1 vollständig ab');
+
   assert.equal(
     s.regeln.einmal + s.regeln.fest + s.regeln.pro_tage,
     s.items,
     'jedes Item hat genau eine Mengenregel'
   );
-  assert.ok(s.tags > 10);
+  assert.ok(s.gepflegt > 0, 'der Fixture enthält gepflegte Mengenregeln');
+});
+
+/* --- Der echte Katalog, falls die private Arbeitskopie vorliegt ------------- */
+
+test('echter Katalog: elf Kategorien und ein gepflegtes Tag-Vokabular (PRD Anhang B.1)', { skip: nurMitEchtemKatalog }, () => {
+  const s = katalogStatistik(validiereKatalog(echterKatalog).katalog);
+  assert.equal(s.kategorien, 11, 'PRD Anhang B.1 friert elf Kategorien ein');
+  assert.ok(s.tags > 10, `nur ${s.tags} Tags — Tag-Vokabular geschrumpft?`);
+  assert.ok(s.items > 200, `nur ${s.items} Items`);
 });
 
 /* --- Reisen und Packlisten ------------------------------------------------- */
@@ -213,6 +251,65 @@ test('kaputte gespeicherte Daten werden als leerer Bestand behandelt', () => {
   assert.deepEqual(ladeDaten(), { version: 1, reisen: [], packlisten: [] });
 });
 
+/* --- Zusammenführen (US-10 und Sync, PRD §4.5) ----------------------------- */
+
+/*
+ * Dieselbe Regel trägt zwei Wege: den Datei-Import (US-10) und den Sync. Sie
+ * liegt deshalb in store.js und nicht in der UI. Der teure Fehlerfall steht im
+ * zweiten Test: ein fremder Stand ohne Packliste darf den lokalen Abhak-Stand
+ * nicht wegwerfen.
+ */
+
+test('fuegeReisenZusammen: gleiche id ersetzt, neue kommen dazu', () => {
+  const bestand = { version: 1, reisen: [{ id: 'a', name: 'Alt' }], packlisten: [] };
+  const neu = { version: 1, reisen: [{ id: 'a', name: 'Neu' }, { id: 'b', name: 'Zusatz' }], packlisten: [] };
+
+  const { daten, dazu } = fuegeReisenZusammen(bestand, neu);
+  assert.equal(dazu, 1, 'nur b ist wirklich neu');
+  assert.equal(daten.reisen.length, 2);
+  assert.equal(daten.reisen.find((r) => r.id === 'a').name, 'Neu');
+  assert.equal(daten.version, 1);
+});
+
+test('fuegeReisenZusammen: eine fremde Reise ohne Packliste lässt den lokalen Abhak-Stand stehen', () => {
+  const bestand = {
+    version: 1,
+    reisen: [{ id: 'a', name: 'Tauchurlaub' }],
+    packlisten: [{ reise_id: 'a', positionen: [{ item_id: 'x', menge: 1, gepackt: true }] }],
+  };
+  const neu = { version: 1, reisen: [{ id: 'a', name: 'Tauchurlaub' }], packlisten: [] };
+
+  const { daten } = fuegeReisenZusammen(bestand, neu);
+  assert.equal(daten.packlisten.length, 1, 'die lokale Liste darf nicht verschwinden');
+  assert.equal(daten.packlisten[0].positionen[0].gepackt, true);
+});
+
+test('fuegeReisenZusammen: eine mitgelieferte Liste ersetzt genau ihre Reise', () => {
+  const bestand = {
+    version: 1,
+    reisen: [{ id: 'a' }, { id: 'b' }],
+    packlisten: [
+      { reise_id: 'a', positionen: [{ item_id: 'x', gepackt: true }] },
+      { reise_id: 'b', positionen: [{ item_id: 'y', gepackt: true }] },
+    ],
+  };
+  const neu = { version: 1, reisen: [{ id: 'a' }], packlisten: [{ reise_id: 'a', positionen: [{ item_id: 'x', gepackt: false }] }] };
+
+  const { daten } = fuegeReisenZusammen(bestand, neu);
+  assert.equal(daten.packlisten.length, 2);
+  assert.equal(daten.packlisten.find((p) => p.reise_id === 'a').positionen[0].gepackt, false, 'a wird ersetzt');
+  assert.equal(daten.packlisten.find((p) => p.reise_id === 'b').positionen[0].gepackt, true, 'b bleibt unberührt');
+});
+
+test('fuegeReisenZusammen verträgt einen leeren Bestand in beide Richtungen', () => {
+  const leer = { version: 1, reisen: [], packlisten: [] };
+  const voll = { version: 1, reisen: [{ id: 'a' }], packlisten: [{ reise_id: 'a', positionen: [] }] };
+
+  assert.equal(fuegeReisenZusammen(leer, voll).daten.reisen.length, 1);
+  assert.equal(fuegeReisenZusammen(voll, leer).daten.reisen.length, 1, 'nichts zu mischen heißt: nichts verlieren');
+  assert.equal(fuegeReisenZusammen(null, voll).daten.reisen.length, 1, 'auch ohne Bestand darf es nicht werfen');
+});
+
 /* --- Reise-Datei prüfen (US-10) -------------------------------------------- */
 
 test('der eigene Export ist wieder einlesbar (US-10)', () => {
@@ -231,7 +328,7 @@ test('eine Reise-Datei ohne reisen-Liste wird abgelehnt', () => {
 
 /* --- Der Durchlauf: Katalog + Reise -> Liste -> Ausgabe -------------------- */
 
-test('kompletter Durchlauf: aus dem echten Katalog wird eine brauchbare Liste', () => {
+test('kompletter Durchlauf: Katalog + Reise -> Liste -> speichern -> laden', () => {
   const katalog = validiereKatalog(katalogRoh).katalog;
 
   const reise = {
@@ -251,7 +348,7 @@ test('kompletter Durchlauf: aus dem echten Katalog wird eine brauchbare Liste', 
   assert.equal(reisetage(reise.von, reise.bis), 10);
 
   const liste = erzeugePackliste(katalog, reise);
-  assert.ok(liste.positionen.length > 50);
+  assert.ok(liste.positionen.length > 5, `nur ${liste.positionen.length} Positionen`);
 
   // Speichern und wieder laden — die Momentaufnahme muss stabil sein
   const daten = leereDaten();
@@ -268,6 +365,25 @@ test('kompletter Durchlauf: aus dem echten Katalog wird eine brauchbare Liste', 
     'Dokumente & Wertsachen',
     'Essentials stehen oben (Anhang B.1, O9)'
   );
+});
+
+test('echter Katalog: der Durchlauf ergibt eine volle Liste', { skip: nurMitEchtemKatalog }, () => {
+  const katalog = validiereKatalog(echterKatalog).katalog;
+  const reise = {
+    id: 'echt-durchlauf',
+    name: 'Tauchurlaub Ägypten',
+    von: '2026-10-01',
+    bis: '2026-10-10',
+    saison: 'Sommer',
+    aktivitaeten: ['Tauchen'],
+    verkehrsmittel: 'Flugzeug',
+    unterkunft: 'Ferienwohnung',
+  };
+
+  const liste = erzeugePackliste(katalog, reise);
+  assert.ok(liste.positionen.length > 50, `nur ${liste.positionen.length} Positionen`);
+  assert.ok(gruppiere(katalog, liste.positionen).length > 5);
+  assert.ok(liste.positionen.every((p) => Number.isInteger(p.menge) && p.menge >= 1));
 });
 
 test('Overrides überleben: abhaken, Menge ändern, entfernen, hinzufügen (US-05, US-06)', () => {
