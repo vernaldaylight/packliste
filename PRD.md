@@ -117,10 +117,11 @@ Für unbekannte Aktivitäten lässt sich ein neuer Tag frei eintippen — die Ap
 | F10 | Liste als Text/Markdown exportieren | P1 |
 | F11 | Reise speichern und später wieder öffnen | P1 |
 | F12 | Nach-der-Reise-Retro: "Was hat gefehlt?" | P1 |
-| F13 | Katalog per Datei in die App importieren (US-09) | P0 |
-| F14 | Reise-Daten per Button als Datei exportieren (US-10) | P0 |
+| F13 | Katalog ins Gerät holen — aus dem Daten-Repo oder per Datei (US-09) | P0 |
+| F14 | Reise-Daten aus dem Gerät herausbringen (US-10) | P0 |
+| F15 | Katalog und Reisen über das private Daten-Repo abgleichen (US-11) | P0 |
 
-**Pflegeweg im MVP**: Der Katalog wird **nicht** über eine UI bearbeitet, sondern über das Repo — Import-Skript für den Erstaufbau, danach gezielte Änderungen an `daten/katalog.json` (§3.6). Der Grund ist die Größe: 333 Items, deren Mengenregeln nach dem Import fast alle noch auf `einmal` stehen. Diese Arbeit ist Bulk-Arbeit und gehört in ein Skript, nicht in hunderte Klicks. Das Ventil für Einzelfälle bleibt US-05 (Overrides pro Reise).
+**Pflegeweg im MVP**: Der Katalog wird **nicht** über eine UI bearbeitet, sondern im privaten Daten-Repo — Import-Skript für den Erstaufbau, danach gezielte Änderungen an `katalog.json` (§3.6). Der Grund ist die Größe: 333 Items, deren Mengenregeln nach dem Import fast alle noch auf `einmal` stehen. Diese Arbeit ist Bulk-Arbeit und gehört in ein Skript, nicht in hunderte Klicks. Das Ventil für Einzelfälle bleibt US-05 (Overrides pro Reise).
 
 ### 3.4 Out of Scope (MVP)
 
@@ -131,9 +132,10 @@ Für unbekannte Aktivitäten lässt sich ein neuer Tag frei eintippen — die Ap
 - **Wetter-API, Gewichts-/Gepäcklimits, Packen nach Tasche, Sharing, PWA/Offline**
 - **Benutzerkonten, Server-Prozess, Datenbank** — das Hosting ist statisch (§3.6), kein laufender Dienst
 - **Katalog-Editor in der UI** — Item-CRUD, Mengenregel-Editor mit Live-Vorschau (FR3) und Tag-Verwaltung kommen in der ersten Überarbeitung nach dem MVP (FF-16)
-- **Automatische Synchronisierung zwischen den Geräten** — im MVP läuft der Datentransfer per Button über Dateien (§4.5). Es gibt **keine Merge-Logik**, weil es nichts zu mischen gibt: Reisen entstehen nur am Handy (Stufe A)
-- **Reisen in beide Richtungen** (Stufe B) und **Katalogänderungen vom Handy** (Stufe C) — beides erst mit FF-16
-- **Katalog im Deployment** — der Build enthält nur die App-Hülle (§3.6)
+- **Synchronisierung im Hintergrund** — der Abgleich mit dem Daten-Repo läuft **nur auf Knopfdruck** (§4.5). Nicht beim Start, nicht im Hintergrund, nie blockierend: gepackt wird unterwegs ohne Netz
+- **Automatisches Zusammenführen zweier Fassungen derselben Reise** — es gibt keine Feld-Merge-Regel und keinen Zeitstempel im Datenmodell. Gleiche `id` wird ersetzt, Neues angehängt. Ob drüben inzwischen etwas anderes liegt, erkennt der Sync über die `sha` der Contents-API, nicht über die Daten (§4.5)
+- **Katalogänderungen vom Handy** (Stufe C) — der Katalog ist am Handy read-only; geschrieben wird er am Mac im Daten-Repo. Erst mit FF-16 sinnvoll
+- **Katalog im Deployment** — der Build enthält nur die App-Hülle; der Katalog liegt in einem **privaten** Repo (§3.6)
 
 ### 3.5 MVP-Definition
 
@@ -143,7 +145,7 @@ Für unbekannte Aktivitäten lässt sich ein neuer Tag frei eintippen — die Ap
 
 ### 3.6 Technische Architektur
 
-**Entschieden am 2026-10-07, Datentransfer nachgeschärft am 2026-10-08.** Leitfrage war: Braucht diese App ein Backend? Nein — und diese Antwort bestimmt jede weitere Entscheidung.
+**Entschieden am 2026-10-07, Datentransfer nachgeschärft am 2026-10-08, auf zwei Repos umgestellt am 2026-10-08.** Leitfrage war: Braucht diese App ein Backend? Nein — und diese Antwort bestimmt jede weitere Entscheidung.
 
 Die App hat genau zwei Aufgaben, die man auslagern *könnte*: **Persistenz** und die **Regel-Engine**. Die Engine ist eine reine Funktion über den Katalog (Tag-Schnittmenge plus Mengenformel) und rechnet bei 333 Items in unter einer Millisekunde — sie gehört in den Browser. Für die Persistenz braucht es keine Transaktionen, keine Mehrbenutzer und keine Geheimnisse. Damit fällt jeder Server-Anteil weg: ein getrenntes Frontend/Backend oder ein Python-Backend würde nur einen zweiten Prozess hinzufügen, den man starten muss, bevor die App funktioniert — für null Gegenwert.
 
@@ -153,35 +155,45 @@ Die App hat genau zwei Aufgaben, die man auslagern *könnte*: **Persistenz** und
 | Build | **Vite** | Dev-Server mit Hot-Reload plus Bundler, ohne Framework-Zwang |
 | UI | **Vanilla JS** | Die Engine ist eine reine Funktion, der Rest ist Formular- und Listen-Handling über fünf Ansichten. Ein UI-Framework wäre hier Ballast |
 | **Inhalt des Deployments** | **Nur die App-Hülle** — kein Katalog, keine Reisen | Die Deploy-URL ist damit öffentlich und trotzdem unbedenklich: sie enthält nichts Persönliches (O11) |
-| Katalog-Transport | **Datei per Button**: `katalog.json` wird am Handy über die Dateiauswahl aus iCloud Drive importiert | iOS-Safari hat **keine** File System Access API — ein Schreibweg in iCloud existiert dort nicht. Die Dateiauswahl zeigt iCloud Drive direkt |
-| Datenspeicherung am Handy | **`localStorage`** für Katalog **und** Reisen | Eine Speicherquelle, ein Importweg. Der Katalog wird beim ersten Start einmal importiert |
-| Datenrückweg | **Share-Sheet** (`navigator.share`) → iCloud Drive, AirDrop oder Mail | Der Export ist bewusst nicht iCloud-spezifisch — alle Ziele liegen im selben Menü. Am Mac landet die Datei im Repo, dann Commit |
-| Katalog-Pflege | **Repo + Import-Skript**, keine UI im MVP | Bulk-Arbeit an 333 Items gehört in Skript und git, nicht in Klicks (§3.3) |
+| **Repos** | **Zwei**: die App-Hülle (öffentlich) und ein **privates** Daten-Repo | Der Katalog enthält **Gesundheitsdaten** — Medikamentennamen stehen als Items darin. Das App-Repo soll öffentlich sein, also dürfen Katalog und `import/` nicht darin liegen (§4.5) |
+| Datentransfer | **GitHub-Contents-API auf Knopfdruck** (`src/sync.js`), fein granuliertes PAT im `localStorage` | Kein Server, kein Proxy: `api.github.com` erlaubt CORS inklusive Preflight für authentifizierte `PUT` (gemessen). Der Abgleich ist ein Knopf, nie ein Hintergrundvorgang |
+| Katalog-Transport | **Datei per Button** *und* Sync: `katalog.json` kommt aus dem Daten-Repo oder über die Dateiauswahl aus iCloud Drive | iOS-Safari hat **keine** File System Access API — ein Schreibweg in iCloud existiert dort nicht. Bei fehlendem Netz ist die Datei der einzige Weg, deshalb bleibt sie erhalten |
+| Datenspeicherung am Handy | **`localStorage`** für Katalog **und** Reisen | Die Arbeitskopie. Eine Speicherquelle, ein Importweg, und der Sync liest und schreibt immer nur von hier |
+| Datenrückweg | Wenn Sync: `reisen.json` im Daten-Repo. Sonst: **Share-Sheet** (`navigator.share`) → iCloud Drive, AirDrop oder Mail | Beide Wege bleiben — ohne Token oder ohne Netz ist der Export der Notausgang |
+| Katalog-Pflege | **Daten-Repo + Import-Skript**, keine UI im MVP | Bulk-Arbeit an 333 Items gehört in Skript und git, nicht in Klicks (§3.3) |
 | Offline | Nicht im MVP | Ohne Service Worker braucht die Seite Netz. Der Markdown-Export (F10) ist der Offline-Pfad; PWA bleibt FF-12 |
 
-**Warum Python trotzdem vorkommt — aber nicht als Backend.** Der einzige Ort, an dem Python hier glänzt, ist der **Excel-Import** (§6): Semikolon als Trennzeichen, UTF-8-Umlaute, Formel-Spalten mit doppelten Spaltennamen. Das ist ein **einmaliges Migrationsskript** `quellen/ → daten/katalog.json`, kein laufender Dienst.
+**Warum Python trotzdem vorkommt — aber nicht als Backend.** Der einzige Ort, an dem Python hier glänzt, ist der **Excel-Import** (§6): Semikolon als Trennzeichen, UTF-8-Umlaute, Formel-Spalten mit doppelten Spaltennamen. Das ist ein **einmaliges Migrationsskript** `quellen/ → katalog.json`, kein laufender Dienst.
 
-**Projektstruktur**
+**Projektstruktur** — das App-Repo enthält nur die Hülle:
 
 ```
-packliste/
+packliste/                       öffentlich
 ├─ index.html
 ├─ src/
-│  ├─ main.js        App-Start — Katalog da? sonst Import-Aufforderung
+│  ├─ main.js        App-Start — Katalog da? sonst Aufforderung; Zustand und Router
 │  ├─ engine.js      Regel-Engine + Mengenformel — reine Funktionen, testbar ohne DOM
-│  ├─ store.js       localStorage lesen/schreiben, Datei-Import, Backup, Share-Export
-│  └─ ui/            die Ansichten
-├─ daten/
-│  └─ katalog.json   der Schatz — im git, NICHT deployt (§4.5)
-└─ scripts/
-   └─ import-csv.py  einmalig: quellen/ → daten/katalog.json
+│  ├─ store.js       localStorage lesen/schreiben, Validierung, Datei-Import, Backup
+│  ├─ sync.js        GitHub-Contents-API — reine Funktionen plus injizierbarer Netzrand
+│  └─ ui/            die Ansichten; syncUi.js trägt Einstellungen und Konfliktdialog
+└─ tests/
+   ├─ fixtures/
+   │  └─ katalog.synthetisch.json   erfundener Katalog: alle 11 Kategorien, alle 3 Regeln
+   └─ smoke.html     Rauchtest im echten Browser
+
+packliste-daten/                 privat — hier liegt der Schatz
+├─ katalog.json     der echte Katalog (262 Items, inkl. Medizin)
+├─ reisen.json      entsteht beim ersten Hochschieben
+└─ import/          mapping.json, erwartungen.json, import.mjs — aus dem Katalog abgeleitet
 ```
 
-**`daten/` liegt bewusst außerhalb von `public/`**: Alles unter `public/` kopiert Vite unverändert in den Build. Läge der Katalog dort, wäre er über die Deploy-URL abrufbar — genau das, was die Entscheidung gegen Weg 1 ausschließt.
+**`daten/` und `import/` liegen bewusst nicht im App-Repo.** Beide enthalten den echten Bestand: der Katalog die Item-Namen samt Medikamenten, `import/mapping.json` die Zuordnung der Quelltabelle darauf. In einem öffentlichen Repo wären sie über die Deploy-URL, das Repo selbst und jeden Fork abrufbar, und ein einmal veröffentlichter Stand lässt sich nicht zurückholen. Sie liegen deshalb in einem **privaten** Repo, auf das ein fein granuliertes Token beschränkt ist (§4.5).
 
-**Wo die App im MVP läuft**: Weil Reisen am Handy entstehen (Stufe A), ist die Browser-App im MVP **praktisch ein Handy-Werkzeug**. Am Mac passiert in dieser Zeit: Import-Skript starten, `daten/katalog.json` bearbeiten, committen. Die File System Access API — der Schreibweg aus 1.2 — wird erst mit dem Katalog-Editor (FF-16) gebraucht und kommt im MVP nicht vor.
+**Warum nicht ein Secret Gist.** „Secret" heißt bei GitHub nur *nicht gelistet* — jeder mit der URL liest mit, und GitHub sagt selbst, ein privater Gist existiere nicht. Dazu kommt: ein Gist-Token gilt für **alle** Gists. Ein Repo-Token lässt sich dagegen auf genau ein Repo beschränken.
 
-**Konsequenz für die Pflege**: Katalogänderungen laufen über `daten/katalog.json` und einen Commit. Damit sie am Handy ankommen, muss die Datei neu importiert werden (§4.5). Am Handy ist der Katalog **read-only**.
+**Wo die App im MVP läuft**: Weil Reisen am Handy entstehen (Stufe A), ist die Browser-App im MVP **praktisch ein Handy-Werkzeug**. Am Mac passiert in dieser Zeit: Import-Skript starten, `katalog.json` im Daten-Repo bearbeiten, committen. Die File System Access API — der Schreibweg aus 1.2 — wird erst mit dem Katalog-Editor (FF-16) gebraucht und kommt im MVP nicht vor.
+
+**Konsequenz für die Pflege**: Katalogänderungen laufen im **Daten-Repo** über `katalog.json` und einen Commit. Damit sie am Handy ankommen, wird dort „Aus GitHub holen" gedrückt (§4.5). Am Handy ist der Katalog **read-only**.
 
 **Verworfene Alternativen** stehen in Anhang C.
 
@@ -265,37 +277,49 @@ Packliste {
 
 Kein Server-Prozess, keine DB, keine Konten. Die Trennung nach Wert bleibt — sie zeigt sich in **zwei Datensätzen mit sehr verschiedenem Lebenslauf**:
 
-| Datensatz | Inhalt | Master liegt | Am Handy |
+| Datensatz | Inhalt | Master liegt | Am Gerät |
 |---|---|---|---|
-| `katalog.json` | `items` | **Datei im Repo** (`daten/`) | `localStorage`, einmal per Button importiert |
-| Reisen + Packlisten | `reisen`, `packlisten` | **`localStorage` am Handy** | dasselbe — es gibt keinen zweiten Ort |
+| `katalog.json` | `items` | **privates Daten-Repo** | `localStorage`, Arbeitskopie |
+| `reisen.json` | `reisen`, `packlisten` | **privates Daten-Repo** | `localStorage`, Arbeitskopie |
 
 ```json
-// daten/katalog.json  — im git, NICHT deployt
+// katalog.json  — im privaten Daten-Repo, NICHT im App-Repo, NICHT deployt
 { "version": 1, "items": [ ... ] }
 
-// localStorage["packliste.reisen"]  — am Handy, nirgends sonst
+// reisen.json  — im privaten Daten-Repo; entsteht beim ersten Hochschieben
 { "version": 1, "reisen": [ ... ], "packlisten": [ ... ] }
 ```
 
 **Warum getrennt**: Der Katalog ist der einzige Teil, dessen Verlust echte Arbeit kostet. Reisen und Packlisten sind Ableitungen. Getrennt gehalten kann ein schiefgelaufener Schreibvorgang auf einer Packliste den Katalog nicht beschädigen.
 
-**Die Richtungen, in denen Daten fließen** — im MVP bewusst asymmetrisch:
+**`localStorage` ist die Arbeitskopie, das Repo ist der Master.** Diese Reihenfolge ist keine Formsache, sondern trägt den ganzen Entwurf: gepackt wird unterwegs, im Zug, im Flugzeug, ohne Netz. Der Sync wird **nie** beim Start ausgelöst, **nie** im Hintergrund und **nie** blockierend. Ohne Netz läuft die App vollständig aus dem `localStorage`; der Abgleich ist ein ausdrücklicher Knopf, den man drückt, wenn man Netz hat.
 
-| Richtung | Was | Wie |
-|---|---|---|
-| Mac → Handy | `katalog.json` | Datei in iCloud Drive legen, am Handy über den Import-Button holen |
-| Handy → Mac | Reisen, als Backup | Share-Sheet → iCloud Drive oder AirDrop. **Ersetzt nichts, sichert nur** |
+#### Der Abgleich (US-11)
 
-**Es gibt keine automatische Synchronisierung und keine Merge-Regel.** Weil Reisen ausschließlich am Handy entstehen (Stufe A, §3.4), existiert nie eine Reise in zwei Versionen. Genau diese Vereinfachung trägt den MVP — und ist der Grund, warum kein Server gebraucht wird.
+| Handgriff | Ablauf |
+|---|---|
+| **Katalog holen** | `GET katalog.json` → `validiereKatalog` → `speichereKatalog`. Erst prüfen, dann übernehmen — wie bei US-09 |
+| **Reisen hochschieben** | `GET reisen.json` (frische `sha`) → `PUT` mit dem hiesigen Stand. Liegt drüben eine Reise, die es hier nicht gibt, wird **vorher gefragt** |
+| **Reisen holen** | `GET` → `validiereDaten` → über die `id` zusammenführen → `setzeDaten` |
 
-**Der Preis — bewusst akzeptiert**:
+**Der Katalog geht nur in eine Richtung.** Er wird am Mac bearbeitet; die App hat keinen Grund, ihn zu schreiben. Damit schrumpft die Schreibfläche des Tokens auf `reisen.json` — und der Schreibweg ist der Teil, der schiefgehen kann.
 
-- **Der Katalog am Handy kann verschwinden.** iOS räumt Script-Storage von Websites, die 7 Tage nicht geöffnet wurden. Dann fehlt der Katalog und die App zeigt die Import-Aufforderung. **Kein Datenverlust** — der Master liegt im git — aber ein erneuter Import per Button.
-- **Der Katalog ist am Handy read-only.** Geändert wird er am Mac im Editor und per Commit.
+**Zusammengeführt wird über die `id`, nicht über Felder.** Gleiche `id` wird ersetzt, Neues angehängt, Hiesiges bleibt. Eine Packliste gehört zu genau einer Reise und wird als Ganzes ersetzt, nicht positionenweise gemischt — sonst verlöre man beim Holen den Abhak-Stand. Kommt eine Reise ohne Packliste herein, bleibt die hiesige erhalten. **Es gibt keinen Zeitstempel im Datenmodell**: wer zuletzt geschrieben hat, entscheidet der Sync nicht aus den Daten, sondern über die `sha` der Contents-API.
 
-Zwei Nebeneffekte, die den Aufwand sofort rechtfertigen:
-- `katalog.json` kommt **unter Versionskontrolle** (git). Die Historie ist lesbar (Zeilen-Diffs pro Item), Backups kosten nichts, und ein Fehlgriff lässt sich mit `git checkout` zurücknehmen.
+**Der Konflikt wird erkannt, nicht überschrieben.** Die API verlangt beim Schreiben die `sha` der zuletzt gelesenen Fassung; passt sie nicht mehr, antwortet sie mit `409`/`422` und **es wird nichts geschrieben**. Die App zeigt dann drei Wege: *von drüben holen* (führt zusammen), *meinen Stand hochschieben* (ersetzt, bewusst), *nichts tun*. Das ist der ganze Konfliktmechanismus — er braucht weder Server noch Schemaänderung, weil die `sha` die Erkennung trägt.
+
+**Das Token ist ein Passwort.** Ein fein granuliertes PAT, beschränkt auf das eine private Daten-Repo, Berechtigung `Contents: Read and write`. Es liegt **nur** im `localStorage` des Geräts — nie im Code, nie im Build, nie in einer Meldung, nie in einem Log. Wer das entsperrte Gerät in die Hand bekommt, kommt daran; deshalb ein Ablaufdatum und im Verdachtsfall: bei GitHub widerrufen. Die alte `gh`-Anmeldung am Mac ist dafür **nicht** geeignet — sie trägt `repo`-Scope über alle Repositories.
+
+#### Der Preis — bewusst akzeptiert
+
+- **Das Token läuft ab.** Dann scheitert der Sync mit einem `401`, und die Meldung benennt genau das. Bis ein neues Token eingetragen ist, bleiben beide Dateiwege.
+- **Das private Repo wird der neue Single Point of Failure.** Ohne Token oder ohne Netz gibt es den Sync nicht. Deshalb werden die Dateiwege (US-09, US-10) **nicht** entfernt — sie sind der Notausgang.
+- **Der Katalog am Handy kann verschwinden.** iOS räumt Script-Storage von Websites, die 7 Tage nicht geöffnet wurden. Dann fehlt der Katalog und die App zeigt die Aufforderung. **Kein Datenverlust** — der Master liegt im Repo — aber ein erneutes Holen.
+- **Ein Gerät ohne Netz beim ersten Start hat keinen Katalog.** Der leere Zustand bietet deshalb beide Wege an (GitHub **und** Datei), sonst wäre ein frisches Gerät offline aufgeschmissen.
+
+Drei Nebeneffekte, die den Aufwand sofort rechtfertigen:
+- Beide Datensätze stehen **unter Versionskontrolle** (git). Die Historie ist lesbar (Zeilen-Diffs pro Item), Backups kosten nichts, und ein Fehlgriff lässt sich mit `git checkout` zurücknehmen.
+- Die Deploy-URL enthält weiterhin nichts Persönliches — der Katalog liegt woanders, also bleibt es bei „öffentlich und trotzdem unbedenklich" (O11).
 - Getrennte Kataloge pro Person (FF-04) brauchen später nur eine weitere `katalog-<person>.json` — die Reise-Daten bleiben unberührt.
 
 Jede Struktur trägt `version` für spätere Migrationen. Vor jedem Schreiben wird die Vorgängerversion als Backup gesichert.
@@ -399,7 +423,7 @@ Der Import endet mit einer Zusammenfassung: Anzahl importierter Items, Konflikte
 ### US-01 — Katalog pflegen *(nicht im MVP — erste Überarbeitung, siehe FF-16)*
 > Als Nutzerin möchte ich Items mit Kategorie, Tags und Mengenregel anlegen und bearbeiten, damit mein Bestand die Wahrheit über meine Dinge ist.
 
-> **Im MVP ersetzt durch**: Pflege über das Repo — Import-Skript beim Erstaufbau, danach gezielte Änderungen an `daten/katalog.json` (§3.3, §3.6). Die Akzeptanzkriterien unten beschreiben das Zielbild der ersten Überarbeitung.
+> **Im MVP ersetzt durch**: Pflege über das Repo — Import-Skript beim Erstaufbau, danach gezielte Änderungen an `katalog.json` im Daten-Repo (§3.3, §3.6). Die Akzeptanzkriterien unten beschreiben das Zielbild der ersten Überarbeitung.
 
 **Akzeptanzkriterien**
 - [ ] Item anlegen mit Name, genau einer Kategorie, beliebig vielen Tags
@@ -465,17 +489,23 @@ Der Import endet mit einer Zusammenfassung: Anzahl importierter Items, Konflikte
 ### US-08 — Retrospektive *(im MVP nur das Freitextfeld)*
 > Als Nutzerin möchte ich nach der Reise festhalten, was gefehlt hat, damit die Liste beim nächsten Mal besser ist.
 
-> **Eingeschränkt im MVP**: Das Freitextfeld bleibt. „Aus einem Eintrag direkt ein Item anlegen" setzt einen schreibenden Katalog-Editor voraus und wandert mit FF-16 — im MVP wird das Item per Repo-Commit angelegt (die Tags der Reise stehen im Retro-Eintrag dafür bereit).
-
-### US-09 — Katalog aufs Handy holen
-> Als Nutzerin möchte ich meinen Katalog mit einem Button vom Mac aufs Handy bringen, damit die App unterwegs weiß, was ich besitze.
+> **Eingeschränkt im MVP**: Das Freitextfeld bleibt. „Aus einem Eintrag direkt ein Item anlegen" setzt einen schreibenden Katalog-Editor voraus und wandert mit FF-16 — im MVP wird das Item per Commit im Daten-Repo angelegt (die Tags der Reise stehen im Retro-Eintrag dafür bereit).
 
 **Akzeptanzkriterien**
-- [ ] Import-Button öffnet die Dateiauswahl; iCloud Drive ist direkt erreichbar
+- [ ] Freitextfeld "Was hat gefehlt?" an einer Reise
+- [ ] Aus einem Eintrag direkt ein Item anlegen, vorbelegt mit den Tags dieser Reise *(erst mit FF-16)*
+- [ ] Vermerk, aus welcher Reise das Item stammt *(erst mit FF-16)*
+
+### US-09 — Katalog ins Gerät holen
+> Als Nutzerin möchte ich meinen Katalog mit einem Button ins Gerät holen, damit die App unterwegs weiß, was ich besitze.
+
+**Akzeptanzkriterien**
+- [ ] „Aus GitHub holen" lädt `katalog.json` aus dem privaten Daten-Repo
+- [ ] Alternativ öffnet die Dateiauswahl die Dateien; iCloud Drive ist direkt erreichbar — dieser Weg funktioniert **ohne Netz** und ohne Token
 - [ ] Die Datei wird geprüft (Format, `version`, Pflichtfelder) und erst dann übernommen
 - [ ] Bei ungültiger Datei: verständliche Meldung, **bestehender Katalog bleibt unangetastet**
-- [ ] Nach dem Import zeigt die App die Item-Anzahl und die Menge der importierten Regeln
-- [ ] Fehlt der Katalog (erster Start oder nach einer Räumung), zeigt die App eine Import-Aufforderung statt einer leeren Liste
+- [ ] Nach dem Holen zeigt die App die Item-Anzahl und die Menge der übernommenen Regeln
+- [ ] Fehlt der Katalog (erster Start oder nach einer Räumung), zeigt die App eine Aufforderung statt einer leeren Liste — mit **beiden** Wegen
 
 ### US-10 — Daten sichern
 > Als Nutzerin möchte ich meine Reisen mit einem Button als Datei exportieren, damit meine Arbeit nicht nur im Browser eines Geräts liegt.
@@ -485,11 +515,22 @@ Der Import endet mit einer Zusammenfassung: Anzahl importierter Items, Konflikte
 - [ ] iCloud Drive, AirDrop und Mail sind ohne Zusatzarbeit wählbar
 - [ ] Der Export ist eine gültige Datei, die US-09 wieder einlesen kann
 - [ ] Der Export verändert nichts am lokalen Bestand
+- [ ] Der Dateiweg bleibt neben dem Sync bestehen — ohne Netz oder ohne Token ist er der Notausgang
+
+### US-11 — Zwischen Geräten abgleichen
+> Als Nutzerin möchte ich Katalog und Reisen zwischen Handy und Mac abgleichen, ohne dass dabei etwas verloren geht.
 
 **Akzeptanzkriterien**
-- [ ] Freitextfeld "Was hat gefehlt?" an einer Reise
-- [ ] Aus einem Eintrag direkt ein Item anlegen, vorbelegt mit den Tags dieser Reise
-- [ ] Vermerk, aus welcher Reise das Item stammt
+- [ ] Der Abgleich läuft **nur auf Knopfdruck** — nie beim Start, nie im Hintergrund
+- [ ] Ohne Netz oder ohne Token meldet die App das verständlich und läuft aus dem `localStorage` weiter
+- [ ] Repo und Token sind in der App einstellbar; das Token liegt nur im `localStorage` und wird **nie** zurück ins DOM geschrieben
+- [ ] Ein Token lässt sich löschen, ohne das Repo zu vergessen
+- [ ] Hochschieben liest vorher die `sha` und schreibt mit ihr; liegt drüben inzwischen etwas anderes, wird **nichts** geschrieben und der Konflikt gemeldet
+- [ ] Liegt drüben eine Reise, die es hier nicht gibt, wird vor dem Hochschieben gefragt
+- [ ] Holen führt über die `id` zusammen: gleiche Reise wird ersetzt, neue kommen dazu, hiesige bleiben
+- [ ] Ein unbrauchbarer Stand drüben lässt den hiesigen Bestand unangetastet
+- [ ] Eine Fehlermeldung enthält **nie** das Token
+- [ ] Nach einem Konflikt sind **beide** Stände noch vollständig da, und es gibt drei Wege: holen, hochschieben, nichts tun
 
 ---
 
@@ -497,7 +538,7 @@ Der Import endet mit einer Zusammenfassung: Anzahl importierter Items, Konflikte
 
 | ID | Anforderung | Prio |
 |---|---|---|
-| FR1 | Items anlegen, lesen, bearbeiten, löschen | P0 — im MVP über `daten/katalog.json` (§3.6); UI-Editor folgt als FF-16 |
+| FR1 | Items anlegen, lesen, bearbeiten, löschen | P0 — im MVP über `katalog.json` im Daten-Repo (§3.6); UI-Editor folgt als FF-16 |
 | FR2 | Item hat genau eine Kategorie und beliebig viele Tags | P0 |
 | FR3 | Drei Mengenregel-Varianten; Editor-Vorschau „= 4 Stück für 10 Tage" | P0 — Varianten P0, Editor-Vorschau erst mit FF-16. Die *berechnete* Menge bleibt in der fertigen Liste sichtbar (FR7, FR8) |
 | FR4 | Reise-Formular mit automatischer Tag-Ableitung | P0 |
@@ -507,15 +548,20 @@ Der Import endet mit einer Zusammenfassung: Anzahl importierter Items, Konflikte
 | FR8 | Gruppierte, abhakbare Ausgabe | P0 |
 | FR9 | Reise-lokale Overrides am Katalog vorbei | P0 |
 | FR10 | Excel/CSV-Import mit Report | P0 |
-| FR11 | Datenhaltung: Katalog im git als Datei, Laufzeitdaten im `localStorage` | P0 |
+| FR11 | Datenhaltung: `localStorage` als Arbeitskopie, privates Daten-Repo als Master | P0 |
 | FR12 | Export als Markdown | P1 |
 | FR13 | Verkehrsmittel fließt als Tag in `tripTags` ein | P0 |
 | FR14 | Reise speichern, laden, duplizieren | P1 |
 | FR15 | Retro-Eintrag, der ein Item erzeugt | P1 — Item-Erzeugung setzt FF-16 voraus; im MVP nur das Freitextfeld (US-08) |
 | FR16 | Item-Suche und Filter | P2 — mit FF-16 |
-| FR17 | Katalog in die App importieren (Dateiauswahl, Validierung) | P0 |
+| FR17 | Katalog ins Gerät holen — aus dem Daten-Repo oder per Dateiauswahl, in beiden Fällen validiert | P0 |
 | FR18 | Reise-Daten als Datei exportieren (Share-Sheet) | P0 |
-| FR19 | Leerer-Zustand-Ansicht, die zum Import auffordert | P0 |
+| FR19 | Leerer-Zustand-Ansicht, die zum Holen auffordert — mit beiden Wegen | P0 |
+| FR20 | Sync-Einstellungen (Repo, fein granuliertes Token) im `localStorage`; das Token wird **nie** ins DOM zurückgeschrieben und ist löschbar, ohne das Repo zu vergessen | P0 |
+| FR21 | Reisen hochschieben: vorher `sha` lesen, damit schreiben, bei Abweichung nichts schreiben und den Konflikt melden | P0 |
+| FR22 | Reisen holen und über die `id` zusammenführen (gleiche ersetzt, neue dazu, hiesige bleibt) | P0 |
+| FR23 | Einen unbrauchbaren Stand drüben abweisen, ohne den hiesigen Bestand anzutasten | P0 |
+| FR24 | Sync-Fehler als verständlicher deutscher Satz; **ohne Netz läuft die App weiter** und keine Meldung enthält das Token | P0 |
 
 ---
 
@@ -526,7 +572,9 @@ Der Import endet mit einer Zusammenfassung: Anzahl importierter Items, Konflikte
 | Sprache | UI komplett Deutsch, keine Internationalisierung |
 | Plattform | Reine Browser-App; im MVP **am Handy** bedienbar (iOS Safari). Die Katalogpflege am Mac kommt erst mit FF-16 und braucht dort Chrome (File System Access API, §3.6) |
 | Betrieb | Statisch gehostet (§3.6), kein Server-Prozess, kein Login. Die App ist ohne laufenden Laptop nutzbar |
-| Datenschutz | Keine Telemetrie, keine externen Aufrufe; alle Daten bleiben auf dem Gerät. **Das Deployment enthält nur die App-Hülle** — kein Katalog, keine Reisen. Die Deploy-URL ist damit öffentlich und trotzdem unbedenklich (O11, entschieden) |
+| Datenschutz | Keine Telemetrie. **Genau ein externer Aufruf**: `api.github.com` beim Sync, und nur auf Knopfdruck (FR21–FR24). Alle Daten bleiben im `localStorage` des Geräts. **Das Deployment enthält nur die App-Hülle** — kein Katalog, keine Reisen. Die Deploy-URL ist damit öffentlich und trotzdem unbedenklich (O11, entschieden) |
+| Geheimnis | Das Token liegt **nur** im `localStorage`; es steht nicht im Code, nicht im Build, nicht in einer Meldung, nicht in einem Log und nie in einer URL. Es ist auf ein privates Repo beschränkt und läuft ab (§4.5) |
+| Offline | **Der Sync blockiert nie.** Ohne Netz startet die App, zeigt alle Reisen und Listen und meldet den fehlenden Sync als Satz, nicht als Ausnahme. Der Dateiweg (FR17, FR18) braucht kein Netz |
 | Performance | Listen-Erzeugung < 200 ms bei 500 Items |
 | Zuverlässigkeit | Backup der JSON vor jedem Schreiben; Export als Notausgang |
 | Bedienbarkeit | Am Handy einhändig bedienbar; Touch-Ziele ≥ 44 px |
@@ -555,7 +603,12 @@ Bewusst keine Vanity-Metriken: Bei einem Solo-Werkzeug zählt nur, ob das eigene
 | Excel-Import liefert Müll | Hoch | Hoch | Import-Report, Trockenlauf, Original unangetastet lassen |
 | Übermodellierung der Tags | Mittel | Mittel | Tags bleiben Strings; Kategorien bleiben eine flache Liste |
 | Regel-Engine stößt an Grenzen | Mittel | Mittel | Overrides pro Reise (US-05) als Ventil, nicht als Regel-Erweiterung |
-| Datenverlust des Katalogs | Niedrig | Hoch | Getrennte `katalog.json`, Backup vor jedem Schreiben, `katalog.json` unter git, Export als Notausgang |
+| Datenverlust des Katalogs | Niedrig | Hoch | Katalog und `import/` liegen im privaten Daten-Repo (git), Backup vor jedem Schreiben, Export als Notausgang |
+| **Token läuft ab** | Hoch | Mittel | Fein granulierte PATs haben ein Ablaufdatum. Der Sync scheitert dann mit `401`; die Meldung benennt genau das, und beide Dateiwege bleiben |
+| **Token kompromittiert** | Niedrig | Hoch | Auf **ein** privates Repo beschränkt und mit `Contents: Read and write` statt `repo`. Im Verdachtsfall bei GitHub widerrufen — der Verlust kostet dann nur den Sync, nicht die Daten. Das Token steht nie in einer Meldung oder einem Log |
+| **Sync-Konflikt** | Mittel | Mittel | Die `sha` verhindert stilles Überschreiben (FR21). Nach einem Konflikt sind beide Stände da und die Entscheidung liegt beim Menschen |
+| **Zwei Geräte, ein Stand** | Mittel | Mittel | Hochschieben ersetzt die Datei drüben. Liegt dort eine Reise, die es hier nicht gibt, wird vorher gefragt — die `sha` allein fängt das nicht, weil sie nur gleichzeitige Schreibvorgänge erkennt |
+| **Veröffentlichter Stand lässt sich nicht zurückholen** | Niedrig | Hoch | Katalog und `import/` kommen gar nicht erst ins öffentliche Repo. Ein einmal veröffentlichter Stand wäre über Forks und Archive unentfernbar |
 | Scope Creep durch Future Features | Hoch | Mittel | Dieses Dokument; Future Features bleiben ausgeschlossen |
 | Migrationsaufwand frustriert vor dem ersten Nutzen | Mittel | Hoch | Import ist P0 — Nutzen muss in Woche 2 erreichbar sein |
 | Kategorien tragen nicht (11 sind zu viele oder zu wenige) | Mittel | Mittel | Kategorien sind reine Strings; Umbenennen und Zusammenführen ist ein Datensatz-Fix, kein Umbau. Erste Bewährung: der Import der echten Tabelle |
@@ -593,10 +646,11 @@ Solo, Abendarbeit, parallel zum Kurs. Vier Wochen bis nutzbarer MVP.
 | O8 | Kategorien im Import aus Spalten oder Mapping-Tabelle? | Offen — technische Detailfrage, wird beim Import-Spike entschieden. Blockiert nichts |
 | O9 | Grundreihenfolge der Kategorien in der Ausgabe? | ✅ **Die Reihenfolge aus Anhang B.1**: Dokumente & Wertsachen zuerst, Sonstiges zuletzt |
 | O10 | Tags in der UI gruppiert darstellen? | ✅ **Ja, gruppiert** (Klima, Verkehr, Aktivität, Unterkunft). Gespeichert wird flach — die Gruppierung ist reine Darstellung und ändert das Datenmodell nicht |
-| O11 | Wie wird `katalog.json` vor fremdem Zugriff geschützt? | ✅ **Entschieden: Der Schutz erübrigt sich.** Der Katalog wird **nicht deployt** — der Build enthält nur die App-Hülle. Die Deploy-URL darf damit öffentlich sein, und es braucht weder Passwort noch Cloudflare Access. Der Katalog kommt per Import-Button aufs Handy (§4.5, US-09) |
+| O11 | Wie wird `katalog.json` vor fremdem Zugriff geschützt? | ✅ **Entschieden: durch ein privates Repo.** Der Katalog liegt in einem **privaten** Daten-Repo, nicht im App-Repo und nicht im Deployment. Weil er Medikamente nennt, ist das kein „erübrigt sich" mehr, sondern eine echte Anforderung. Das öffentliche App-Repo trägt nur die Hülle; die Deploy-URL darf damit öffentlich sein, und es braucht weder Passwort noch Cloudflare Access (§4.5) |
+| O12 | Gist oder privates Repo als Datenspeicher? | ✅ **Privates Repo.** „Secret" heißt bei GitHub nur *nicht gelistet* — jeder mit der URL liest mit. Dazu gilt ein Gist-Token für **alle** Gists, ein fein granuliertes Repo-Token dagegen für genau eines |
+| O13 | Braucht der Sync eine Merge-Regel? | ✅ **Nein, aber ein `sha`.** Zusammengeführt wird über die `id` (gleiche ersetzt, Neues dazu) — das ist keine Feld-Merge-Regel und braucht keinen Zeitstempel. Ob drüben inzwischen etwas anderes liegt, erkennt die `sha` der Contents-API, nicht die Daten (§4.5) |
 
 **Nur noch eine Frage ist wirklich offen** (O8), und sie ist technisch statt fachlich — sie wird beim Import-Spike entschieden und blockiert nichts. Das fachliche Fundament steht.
-
 ---
 
 ## 14. Future Features (bewusst nicht im MVP)
@@ -606,9 +660,11 @@ Nach Wert für das Kernproblem geordnet — nicht nach Umsetzungsaufwand.
 ### Erste Überarbeitung — direkt nach dem MVP
 
 **FF-16 · Katalog-Editor in der UI** *(aus dem MVP verschoben — siehe US-01, FR1, FR3, FR15)*
-Item-CRUD, Mengenregel-Editor mit Live-Vorschau (FR3), Liste filterbar nach Kategorie und Tag. Bringt den Schreibweg aus §3.6 ins Spiel: Chrome auf macOS über die File System Access API, direktes Schreiben in `daten/katalog.json`, Backup vor jedem Schreiben.
+Item-CRUD, Mengenregel-Editor mit Live-Vorschau (FR3), Liste filterbar nach Kategorie und Tag. Bringt einen Schreibweg für den Katalog ins Spiel: Chrome auf macOS über die File System Access API, direktes Schreiben in `katalog.json` des **Daten-Repos**, Backup vor jedem Schreiben — oder der Weg über die Contents-API, den `src/sync.js` schon bereitstellt.
 
-**Zieht drei Fragen mit sich**, die dann zu entscheiden sind: Wird der Katalog am Handy dadurch schreibbar (Stufe C), braucht es Item-Merge. Die Live-Vorschau wird erst mit ihm möglich. Und der Retro-Direktweg (US-08/FR15) setzt ihn voraus.
+**Was der Sync dafür schon mitbringt**: die Contents-API samt Validierung und Konflikterkennung liegt fertig in `src/sync.js`; ein Katalog-Push wäre derselbe Weg wie `schiebeReisen`. Was fehlt, ist die Bedienung (FR3), nicht der Transport.
+
+**Zieht zwei Fragen mit sich**, die dann zu entscheiden sind: Wird der Katalog am Handy dadurch schreibbar (Stufe C), und wie werden Items zusammengeführt (`import/erwartungen.json` ist mit dem Umzug ins private Repo aus dem öffentlichen Testpfad heraus). Die Live-Vorschau wird erst mit ihm möglich. Und der Retro-Direktweg (US-08/FR15) setzt ihn voraus.
 
 **Warum verschoben**: Der Erstaufbau des Katalogs ist Bulk-Arbeit an 333 Items und gehört in ein Skript. Für die ersten echten Reisen genügt das Repo als Pflegeweg. Der Editor lohnt sich erst, wenn der Katalog steht und Einzeländerungen häufig werden.
 
@@ -767,9 +823,13 @@ Dabei entstehen zwei Lücken, die der Import-Report (F7) ausweisen muss:
 | UI-Framework (React/Svelte/Vue) | Fünf Ansichten, deren Kern eine reine Funktion ist. Vanilla JS reicht und spart eine Abhängigkeit |
 | Katalog-Editor im MVP | Bulk-Arbeit an 333 Items gehört in ein Skript. Der Editor lohnt sich erst, wenn der Katalog steht (FF-16) |
 | Katalog im Deployment (Weg 1) | Hätte das Handy automatisch aktuell gehalten, aber `katalog.json` wäre über die Deploy-URL für jeden abrufbar — und ein Zugriffsschutz hätte auf iOS einen Login-Schritt gekostet. Der Import per Button ist der billigere Preis (O11) |
-| Automatische Synchronisierung / Merge | Braucht einen Server oder eine Merge-Regel. Beides unnötig, solange Reisen nur am Handy entstehen (Stufe A) |
-| Reisen in beide Richtungen (Stufe B) | Kostet Merge-Logik pro Reise. Erst sinnvoll, wenn das Planen am Schreibtisch sich als echtes Bedürfnis zeigt — das Formular hat sechs Felder |
-| Verzeichnis `public/` für den Katalog | Vite kopiert `public/` unverändert in den Build — der Katalog wäre damit ungewollt deployt. Er liegt deshalb in `daten/` (§3.6) |
+| **Secret Gist als Datenspeicher** | „Secret" heißt bei GitHub nur *nicht gelistet* — jeder mit der URL liest mit; ein privater Gist existiert nicht. Dazu deckt ein Gist-Token **alle** Gists ab, ein fein granuliertes Repo-Token genau eines. Ein Link, der einmal in einem Repo, Bundle oder Verlauf steht, ist nicht mehr zurückzuholen (O12) |
+| **Proxy für die GitHub-API** | Für nötig gehalten, dann gemessen: `api.github.com` erlaubt CORS inklusive Preflight für authentifizierte `PUT` (`allow-origin: *`). Ein Proxy hätte einen Server hinzugefügt, den diese App sonst nirgends braucht |
+| **Katalog-Push aus der App** | Die App hat keinen Grund, den Katalog zu schreiben — bearbeitet wird er am Mac. Ohne Katalog-Push schrumpft die Schreibfläche des Tokens auf `reisen.json`, und das ist der Teil, der schiefgehen kann |
+| **Merge-Regel pro Reise** | Nicht nötig, solange Reisen an einem Gerät entstehen. Zusammengeführt wird über die `id`, und ob drüben etwas anderes liegt, sagt die `sha` — dafür braucht es keinen Zeitstempel im Datenmodell |
+| Automatische Synchronisierung / Merge | Braucht einen Server *oder* eine Merge-Regel. Beides unnötig, solange Reisen nur am Handy entstehen (Stufe A) |
+| **Reisen in beide Richtungen ohne Nachfrage** | Seit 1.7 gehen Reisen sehr wohl in beide Richtungen — aber als ausdrücklicher Knopf, nicht im Hintergrund. Wer hochschiebt, entscheidet; und wenn drüben eine Reise liegt, die es hier nicht gibt, wird vorher gefragt. Das ist das Stück Stufe B, das ohne Merge-Regel zu haben ist |
+| Verzeichnis `public/` für den Katalog | Vite kopiert `public/` unverändert in den Build — der Katalog wäre damit ungewollt deployt. Er liegt deshalb ganz außerhalb des App-Repos (§3.6) |
 | Git-Repo in iCloud Drive | iCloud und git vertragen sich nicht; Sync-Konflikte beschädigen `.git`. iCloud ist der Transport, nicht das Repository |
 
 ---
@@ -778,6 +838,7 @@ Dabei entstehen zwei Lücken, die der Import-Report (F7) ausweisen muss:
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 1.7 | 2026-10-08 | **Zwei Repos statt einem.** Das App-Repo wird öffentlich und enthält nur noch die Hülle; Katalog und `import/` ziehen in ein **privates** Daten-Repo, weil der Katalog Gesundheitsdaten enthält (Medikamentennamen) und `mapping.json` echte Item-Namen — ein einmal veröffentlichter Stand ist nicht zurückzuholen. Datentransfer um **US-11** ergänzt: Abgleich über die GitHub-Contents-API auf Knopfdruck, fein granuliertes PAT nur im `localStorage`. Der Katalog geht nur noch **eine** Richtung (App liest, schreibt nie); Reisen gehen hoch und werden ausdrücklich geholt. Konflikte erkennt die `sha` der Contents-API — **keine** Merge-Regel, kein Zeitstempel im Datenmodell (O12, O13). `localStorage` ist jetzt ausdrücklich Arbeitskopie statt Master; der Sync blockiert nie. Neuer §4.5, FR20–FR24, F15, §9 um Geheimnis und Offline erweitert, §11 um Token, Konflikt und Veröffentlichung. O11 von „Schutz erübrigt sich" auf „privates Repo" korrigiert. Der Secret-Gist-Weg und ein API-Proxy sind als verworfen dokumentiert. Tests: erfundener Fixture-Katalog im öffentlichen Repo, der echte Katalog wird zusätzlich getestet, wenn er lokal liegt |
 | 1.6 | 2026-10-08 | Tags aufgeräumt. Neuer Tag **`UW-Fotografie`** in Anhang B.2 (Gruppe **Aktivität**): Unterwasser-Foto-Gerät (Gehäuse, Box, Auftriebskörper, Glasfaserkabel, Kleinteile, UW-Kamera, Ladegerät) hing an `Tauchen`, während Kamera und Zubehör an `Fotografie` hingen — auf einer Tauchreise kam so das Gehäuse ohne Kamera mit. Jetzt trägt das reine UW-Gerät nur `UW-Fotografie`; Kamera, SD Karte, Festplatte, Blitz, Arme, Diffusor, Fisheye, Schellen, GoPro und das Ladegerät der Kamera tragen beides und kommen auf Land- wie UW-Fotoreisen. `Flugzeug` war mit einem einzigen Item leer: `Nackenkissen` und ein Beutel (**Allgemein** weg, sie kommen nur auf Flugreisen mit), `Wollsocken` und `Sonnencreme` tragen es zusätzlich (PRD §4.3, §5.2). `Handtuch` verliert `Allgemein` (schickte es auch ins Hotel, das laut B.2 keins braucht) und hängt jetzt an `Strand`/`Camping`/`Ferienwohnung`/`Hostel`. `Ohrstöpsel` von `Allgemein` auf `Hostel`/`Camping`. Wirkungslose Doppel-Tags entfernt, wo `Allgemein` schon alles abdeckt (`Hausschuhe`, `Taschentücher`, `Wasserbehälter`). `Poncho` zusätzlich an `Strand`. Die fünf Kleidungsstücke mit `Tauchen` bleiben als Trocki-Unterzeug — PRD §6.2 verlangt hier bewusst Handarbeit, kein Automatismus |
 | 1.5 | 2026-10-08 | Neuer Tag `Reiseapotheke` in Anhang B.2 (Gruppe **Basis**). Die Kategorie `Medizin` hängt nicht mehr an `Allgemein`: ihre 47 Items trugen ein Drittel jeder Packliste bei und kommen jetzt nur noch mit, wenn der Tag gewählt wird. Die Actionkamera verliert `Sport` und hängt an `Fotografie`, das Sportoberteil an `Allgemein`. `mapping.json` und `erwartungen.json` bleiben bewusst auf ihrem Stand — sie beschreiben den Lauf des stillgelegten Imports, nicht mehr den Katalog, und können Löschungen und Umbenennungen ohnehin nicht abbilden. Sie sind ab jetzt historisch |
 | 1.4 | 2026-10-08 | Katalog interaktiv überarbeitet. Tag `Sport` aus Anhang B.2 entfernt — er trug nur zwei Items (eine Actionkamera und ein Sportoberteil), und beide kamen über andere Tags ohnehin mit; die im PRD genannten Laufschuhe und Fitnesszeug wurden nie in den Katalog aufgenommen. `daten/katalog.json` wird ab jetzt **von Hand gepflegt**: der Excel-Import ist einmal gelaufen und danach totgelegt (`import.mjs --write` gesperrt, `npm run katalog` entfernt), weil `mapping.json` keine Umbenennungen, Löschungen oder Tag-Korrekturen kennt und die Pflegearbeit sonst überschreiben würde. Katalog 265 → 262 Items: `Jacke`, `Pulli`, `Schal`, `Schuhe`, `Strumpfkopf` gelöscht, fünf Items umbenannt, zwei dünne Kopfbedeckungen ergänzt |
