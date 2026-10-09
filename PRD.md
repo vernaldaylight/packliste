@@ -390,7 +390,7 @@ gruppieren nach item.kategorie
 sortieren: Kategorien in fester Reihenfolge, Items alphabetisch
 ```
 
-`"Allgemein"` ist implizit in jeder Reise enthalten — das ist das Fundament, auf dem alles andere aufsetzt (Zahnbürste, Ladegerät, Reisepass). Es lässt sich nicht abwählen: es steht nicht in der Liste der abgeleiteten Tags, die das Formular zum Streichen anbietet.
+`"Allgemein"` ist implizit in jeder Reise enthalten — das ist das Fundament, auf dem alles andere aufsetzt (Zahnbürste, Ladegerät, Reisepass). Es lässt sich nicht abwählen: in der Reihe der abgeleiteten Tags steht es zwar mit, aber nicht als Schalter, sondern still — kein Antippen, kein ↺.
 
 **Mit einer Person** kommt deren Geschlechts-Tag dazu, und ihre eigenen Aktivitäten:
 

@@ -9,7 +9,8 @@
  * Tags landen in `entfernte_tags` und lassen sich von dort wieder aufnehmen —
  * ohne diese Gegenbuchse wäre ein abgeleiteter Tag nur durch Leeren des ganzen
  * Feldes loszuwerden (siehe engine.js, tripTags). Ausnahme ist `Allgemein`: es
- * ist das Fundament jeder Reise und lässt sich nicht streichen.
+ * ist das Fundament jeder Reise, steht in der Reihe der abgeleiteten Tags und
+ * lässt sich nicht streichen.
  *
  * Die Basis-Tags stehen in einer eigenen Karte. `Reiseapotheke` ist dort ein
  * normaler Schalter — die Kategorie `Medizin` hängt an ihm, nicht an `Allgemein`,
@@ -23,7 +24,6 @@
 import { h, karte, feld, meldung } from './dom.js';
 import {
   reisetage,
-  tripTags,
   abgeleiteteTags,
   erzeugePackliste,
   erzeugePacklisten,
@@ -78,7 +78,6 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
   const unterkunftAnzeige = h('div', { class: 'tag-reihe' });
   const abgeleitetAnzeige = h('div', { class: 'tag-reihe' });
   const zusatzAnzeige = h('div', { class: 'tag-reihe' });
-  const wirksamAnzeige = h('div', { class: 'tag-reihe' });
 
   /* --- Bausteine ---------------------------------------------------------- */
 
@@ -218,9 +217,11 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
           ))
     );
 
-    // Abgeleitete Tags: sichtbar, einzeln entfernbar (US-03) — außer Allgemein
-    const abgeleitet = [...abgeleiteteTags(entwurf)].filter((t) => t !== BASIS_TAG).sort();
+    // Abgeleitete Tags: sichtbar, einzeln entfernbar (US-03). Allgemein steht
+    // daneben, ist aber immer dabei und lässt sich nicht abwählen.
+    const abgeleitet = [...abgeleiteteTags(entwurf)].sort();
     abgeleitetAnzeige.replaceChildren(
+      h('span', { class: 'chip chip-ruhig' }, BASIS_TAG),
       ...abgeleitet.map((t) => {
         const weg = entwurf.entfernte_tags.includes(t);
         return h(
@@ -242,11 +243,6 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
     );
 
     zeichnePersonen();
-
-    // Die tatsächlich wirksame Tag-Menge — der Input der Engine
-    wirksamAnzeige.replaceChildren(
-      ...[...tripTags(entwurf)].sort().map((t) => h('span', { class: 'chip chip-ruhig' }, t))
-    );
   }
 
   /* --- Personen (PRD §4.6) ------------------------------------------------ */
@@ -498,15 +494,7 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
       neuePersonFeld
     ),
 
-    karte(
-      'Basis',
-      basisAnzeige,
-      h(
-        'p',
-        { class: 'feld-hinweis' },
-        `„${BASIS_TAG}" ist immer dabei und lässt sich nicht abwählen. Die Reiseapotheke hängt an ihrer eigenen Kategorie Medizin — ohne diesen Schalter kommen die Medikamente nicht mit.`
-      )
-    ),
+    karte('Basis', basisAnzeige),
 
     karte('Saison', saisonAnzeige),
 
@@ -519,24 +507,16 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
       })
     ),
 
-    karte(
-      'Verkehrsmittel',
-      verkehrsAnzeige,
-      h('p', { class: 'feld-hinweis' }, 'Kein Regelwerk — ein Tag wie jeder andere (O7). Wer mit dem Auto fährt, bekommt die Flugzeug-Items nicht.')
-    ),
+    karte('Verkehrsmittel', verkehrsAnzeige),
 
-    karte(
-      'Unterkunft',
-      unterkunftAnzeige,
-      h('p', { class: 'feld-hinweis' }, 'Im Hotel gibt es Handtuch und Föhn — Handtuch und Föhn tragen dieses Tag deshalb einfach nicht.')
-    ),
+    karte('Unterkunft', unterkunftAnzeige),
 
     karte(
       'Abgeleitete Tags',
       h(
         'p',
         { class: 'feld-hinweis' },
-        `Das kommt aus deinen Angaben. Antippen streicht einen Tag für diese Reise; mit ↺ holst du ihn zurück. „${BASIS_TAG}" steht hier nicht — es ist nicht abwählbar.`
+        'Das kommt aus deinen Angaben. Antippen streicht einen Tag für diese Reise; mit ↺ holst du ihn zurück.'
       ),
       abgeleitetAnzeige,
       h('h3', { class: 'unter-titel' }, 'Zusätzliche Tags'),
@@ -544,12 +524,6 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
       freitextFeld('Eigener Tag, z. B. Tropen …', (t) => {
         if (!entwurf.zusatz_tags.includes(t)) entwurf.zusatz_tags.push(t);
       })
-    ),
-
-    karte(
-      'Was die App daraus liest',
-      wirksamAnzeige,
-      h('p', { class: 'feld-hinweis' }, `„${BASIS_TAG}" ist immer dabei — das Fundament, auf dem alles andere aufsetzt.`)
     ),
 
     h(
