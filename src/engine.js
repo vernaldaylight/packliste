@@ -10,6 +10,8 @@
  *              ∪ zusatz_tags ∪ {"Allgemein"}   \ entfernte_tags
  *   `Allgemein` ist das Fundament und lässt sich nicht streichen — entfernte_tags
  *   kann es nicht abwählen.
+ *   Mit Person kommt deren eigener Satz dazu (tripTagsFuerPerson): ihre
+ *   Aktivitäten, ihr Geschlechts-Tag und ihre Reiseapotheke.
  *   item überspringen, wenn item.nicht_mit ∩ tripTags ≠ ∅
  *   item aufnehmen,   wenn item.tags     ∩ tripTags ≠ ∅
  */
@@ -67,6 +69,17 @@ export const BASIS_TAGS = TAG_GRUPPEN.find((g) => g.gruppe === 'Basis').tags;
  * dabei und wird nicht als Schalter gezeigt — die Reiseapotheke dagegen schon.
  */
 export const WAHLBARE_BASIS_TAGS = BASIS_TAGS.filter((t) => t !== BASIS_TAG);
+
+/**
+ * Die Reiseapotheke — der einzige wahlbare Basis-Tag, und seit 1.14 eine Angabe
+ * **je Person** (PRD §4.6). Auf Reise-Ebene bliebe sie für alle Mitfahrenden
+ * dieselbe: bei zwei Personen stünden dieselben 47 Medizin-Items zweimal auf
+ * dem Zettel, obwohl die Apotheke einmal gepackt wird. Auf Reise-Ebene wählbar
+ * bleibt sie nur für Reisen ohne Teilnehmer (ansichtReise.js).
+ *
+ * Abgeleitet statt neu getippt — sonst stünde der Name zweimal in diesem Modul.
+ */
+export const REISEAPOTHEKE_TAG = WAHLBARE_BASIS_TAGS[0];
 
 /**
  * Die Saison-/Klima-Tags — abgeleitet aus der Gruppe statt neu getippt, wie
@@ -260,20 +273,22 @@ export function personTags(person) {
 /**
  * Wie `tripTags`, aber für genau **eine** Person:
  *
- *   tripTags(reise) ∪ teilnehmer.aktivitaeten ∪ personTags(person)
+ *   tripTags(reise) ∪ teilnehmer.aktivitaeten ∪ {Reiseapotheke} ∪ personTags(person)
  *
  * Personen-Aktivitäten kommen **nach** `entfernte_tags` dazu und gewinnen damit:
  * sie sind die ausdrückliche Angabe dieser Person, ein Streichen der Reise gilt
- * für sie nicht.
+ * für sie nicht. Für die Reiseapotheke gilt dasselbe — sie ist seit 1.14 eine
+ * Angabe je Person und damit auf genau dieser einen Liste zu Hause.
  *
  * @param {object} reise
- * @param {{aktivitaeten?: string[]}} teilnehmer — der Eintrag dieser Person an dieser Reise
+ * @param {{aktivitaeten?: string[], reiseapotheke?: boolean}} teilnehmer — der Eintrag dieser Person an dieser Reise
  * @param {{geschlecht?: string}} person
  * @returns {Set<string>}
  */
 export function tripTagsFuerPerson(reise, teilnehmer, person) {
   const tags = tripTags(reise);
   for (const t of teilnehmer?.aktivitaeten ?? []) if (t) tags.add(t);
+  if (teilnehmer?.reiseapotheke) tags.add(REISEAPOTHEKE_TAG);
   for (const t of personTags(person)) tags.add(t);
   return tags;
 }

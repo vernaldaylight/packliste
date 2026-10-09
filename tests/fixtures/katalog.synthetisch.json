@@ -137,6 +137,15 @@
       "im_besitz": true
     },
     {
+      "id": "reiseapotheke-set",
+      "name": "Reiseapotheke-Set",
+      "kategorie": "Medizin",
+      "tags": ["Reiseapotheke"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
       "id": "reisepass",
       "name": "Reisepass",
       "kategorie": "Dokumente & Wertsachen",

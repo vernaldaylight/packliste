@@ -38,6 +38,7 @@ import {
   VERKEHRSMITTEL,
   UNTERKUNFT,
   BEKANNTE_TAGS,
+  REISEAPOTHEKE_TAG,
   PERSON_TAGS,
   GESCHLECHT_TAGS,
 } from '../src/engine.js';
@@ -331,6 +332,55 @@ test('Personen-Aktivitäten gewinnen gegen entfernte_tags der Reise', () => {
 
   const tags = tripTagsFuerPerson(reise, { person_id: ANNA.id, aktivitaeten: ['Fotografie'] }, ANNA);
   assert.ok(tags.has('Fotografie'), 'die Person holt ihre eigene Aktivität zurück');
+});
+
+/* --- Reiseapotheke je Person (1.14) ---------------------------------------- */
+
+test('die Reiseapotheke ist eine Angabe je Person', () => {
+  const mit = tripTagsFuerPerson(REISE, { person_id: ANNA.id, reiseapotheke: true }, ANNA);
+  const ohne = tripTagsFuerPerson(REISE, { person_id: ANNA.id, reiseapotheke: false }, ANNA);
+  const garNicht = tripTagsFuerPerson(REISE, { person_id: ANNA.id }, ANNA);
+
+  assert.ok(mit.has(REISEAPOTHEKE_TAG), 'angehakt heißt: der Tag ist dabei');
+  assert.ok(!ohne.has(REISEAPOTHEKE_TAG), 'abgehakt heißt: nicht dabei');
+  assert.ok(!garNicht.has(REISEAPOTHEKE_TAG), 'ohne Angabe (Altbestand) auch nicht');
+  assert.ok(!tripTags(REISE).has(REISEAPOTHEKE_TAG), 'die Reise selbst trägt sie nicht mehr');
+});
+
+test('die Apotheke der einen Person landet nicht bei der anderen', () => {
+  const anna = tripTagsFuerPerson(REISE, { person_id: ANNA.id, reiseapotheke: true }, ANNA);
+  const ben = tripTagsFuerPerson(REISE, { person_id: BEN.id, reiseapotheke: false }, BEN);
+
+  assert.ok(anna.has(REISEAPOTHEKE_TAG) && !ben.has(REISEAPOTHEKE_TAG));
+});
+
+test('die Apotheke einer Person gewinnt gegen entfernte_tags der Reise', () => {
+  const reise = { ...REISE, entfernte_tags: [REISEAPOTHEKE_TAG] };
+  assert.ok(!tripTags(reise).has(REISEAPOTHEKE_TAG), 'Vorbedingung: die Reise hat sie gestrichen');
+
+  const tags = tripTagsFuerPerson(reise, { person_id: ANNA.id, reiseapotheke: true }, ANNA);
+  assert.ok(tags.has(REISEAPOTHEKE_TAG), 'die ausdrückliche Angabe dieser Person gilt');
+});
+
+test('erzeugePacklisten: die Apotheke steht nur auf der Liste mit dem Häkchen', () => {
+  const listen = erzeugePacklisten(
+    SPIELZEUG,
+    REISE,
+    [ANNA, BEN],
+    [
+      { person_id: ANNA.id, aktivitaeten: [], reiseapotheke: true },
+      { person_id: BEN.id, aktivitaeten: [] },
+    ]
+  );
+
+  assert.equal(listen.length, 2);
+  assert.ok(ids(listen[0]).has('reiseapotheke-set'), 'Annas Liste hat die Apotheke');
+  assert.ok(!ids(listen[1]).has('reiseapotheke-set'), 'Bens Liste nicht');
+});
+
+test('erzeugePackliste ohne Teilnehmer-Eintrag lässt die Apotheke weg', () => {
+  const liste = erzeugePackliste(SPIELZEUG, REISE, { person: ANNA });
+  assert.ok(!ids(liste).has('reiseapotheke-set'));
 });
 
 /* --- Auswahl je Person ----------------------------------------------------- */

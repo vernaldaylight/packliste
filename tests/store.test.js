@@ -44,6 +44,7 @@ const {
   katalogBackupVorhanden,
   ladeDaten,
   speichereDaten,
+  normalisiereDaten,
   leereDaten,
   fuegeReisenZusammen,
   neueId,
@@ -354,6 +355,41 @@ test('ein Stand ohne personen bleibt gültig und wird aufgefüllt', () => {
   assert.equal(d.packlisten[0].person_id, undefined, 'einer alten Liste wird kein person_id angedichtet');
 });
 
+test('reiseapotheke am Teilnehmer: Form wird aufgefüllt, Wert bleibt (1.14)', () => {
+  const roh = {
+    version: 2,
+    personen: [{ id: 'p1', name: 'Anna' }, { id: 'p2', name: 'Ben' }],
+    reisen: [
+      {
+        id: 'r1',
+        name: 'Tauchurlaub',
+        teilnehmer: [{ person_id: 'p1', reiseapotheke: true }, { person_id: 'p2' }],
+      },
+    ],
+  };
+
+  const d = normalisiereDaten(roh);
+  const [anna, ben] = d.reisen[0].teilnehmer;
+  assert.equal(anna.reiseapotheke, true, 'ein gesetztes Häkchen bleibt');
+  assert.equal(ben.reiseapotheke, false, 'ohne Angabe wird daraus ein klares Nein');
+  // `true` bleibt `true` — nicht bloß „irgendwas Wahres".
+  assert.equal(normalisiereDaten({ reisen: [{ id: 'r', teilnehmer: [{ person_id: 'p', reiseapotheke: 'ja' }] }] }).reisen[0].teilnehmer[0].reiseapotheke, false);
+});
+
+test('das Apotheken-Häkchen überlebt Speichern und Laden', () => {
+  speichereDaten(
+    normalisiereDaten({
+      version: 2,
+      personen: [{ id: 'p1', name: 'Anna' }],
+      reisen: [{ id: 'r1', name: 'Tauchurlaub', teilnehmer: [{ person_id: 'p1', reiseapotheke: true }] }],
+      packlisten: [],
+    })
+  );
+
+  const d = ladeDaten();
+  assert.equal(d.reisen[0].teilnehmer[0].reiseapotheke, true);
+});
+
 test('ein Saison-String aus dem Altbestand wird zu einer Liste (1.10)', () => {
   // Genau der Fall, den ein zweites Gerät mit alter App-Version erzeugt: dort
   // steht `saison` noch als Einzelwert. Die Umstellung passiert beim Laden,
@@ -477,7 +513,11 @@ test('validiereDaten nimmt personen, teilnehmer und person_id an', () => {
   const p = validiereDaten(datei);
   assert.ok(p.ok);
   assert.deepEqual(p.daten.personen, datei.personen);
-  assert.deepEqual(p.daten.reisen[0].teilnehmer, datei.reisen[0].teilnehmer);
+  // Zurück kommt die vollständige Form: das fehlende `reiseapotheke` ist
+  // aufgefüllt, die Angaben der Datei stehen unverändert daneben (1.14).
+  assert.deepEqual(p.daten.reisen[0].teilnehmer, [
+    { person_id: 'p1', aktivitaeten: ['Fotografie'], reiseapotheke: false },
+  ]);
 });
 
 test('validiereDaten lehnt kaputte Personen und Teilnehmer ab', () => {
@@ -488,6 +528,7 @@ test('validiereDaten lehnt kaputte Personen und Teilnehmer ab', () => {
     [{ reisen: [reise], personen: [{ id: 'p1' }] }, /Person #1: name fehlt/],
     [{ reisen: [{ ...reise, teilnehmer: 'keine Liste' }] }, /"teilnehmer" ist keine Liste/],
     [{ reisen: [{ ...reise, teilnehmer: [{ aktivitaeten: [] }] }] }, /Teilnehmer #1: person_id fehlt/],
+    [{ reisen: [{ ...reise, teilnehmer: [{ person_id: 'p1', reiseapotheke: 'ja' }] }] }, /reiseapotheke ist kein Wahrheitswert/],
     [{ reisen: [reise], packlisten: [{ person_id: 'p1' }] }, /Packliste #1: reise_id fehlt/],
     [{ reisen: [reise], packlisten: [{ reise_id: 'r1', person_id: 7 }] }, /person_id ist weder Text noch null/],
   ];

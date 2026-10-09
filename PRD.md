@@ -1,6 +1,6 @@
 # Packliste — Product Requirements Document
 
-**Version**: 1.13
+**Version**: 1.14
 **Datum**: 2026-10-09
 **Autor**: Sarah
 **Status**: Abgestimmt — bereit für die Umsetzung. Technische Architektur entschieden (§3.6). Der Katalog-Editor ist aus dem MVP in die erste Überarbeitung verschoben (FF-16).
@@ -250,17 +250,18 @@ Reise {
   aktivitaeten: string[]          // ["Tauchen", "Schnorcheln"]
   verkehrsmittel: "Flugzeug" | ""  // "" = nicht gewählt
   unterkunft: "Camping" | "Ferienwohnung" | "Hotel" | "Hostel" | ""
-  zusatz_tags: string[]           // über Schalter (Reiseapotheke); der Rest ist Altbestand (1.11)
+  zusatz_tags: string[]           // über Schalter; seit 1.14 nur noch Altbestand und Reisen ohne Teilnehmer
   teilnehmer: Teilnehmer[]        // leer = Reise ohne Personen (§4.6)
 }
 
 Teilnehmer {
   person_id: string               // zeigt auf einen Eintrag in `personen` (§4.5)
   aktivitaeten: string[]          // NUR für diese Person, z. B. ["Fotografie"]
+  reiseapotheke: boolean          // NUR für diese Person (1.14)
 }
 ```
 
-`teilnehmer` ist der **einzige** personenbezogene Teil der Reise. Das Geschlecht steht an der Person im Register, nicht hier: es gilt für alle ihre Reisen. Die Aktivitäten stehen hier, nicht an der Person — was jemand auf *dieser* Reise tut, sagt die Reise.
+`teilnehmer` ist der **einzige** personenbezogene Teil der Reise. Das Geschlecht steht an der Person im Register, nicht hier: es gilt für alle ihre Reisen. Aktivitäten und Reiseapotheke stehen hier, nicht an der Person — was jemand auf *dieser* Reise tut und was er davon einpackt, sagt die Reise.
 
 Eine Reise ohne `teilnehmer` ist der Altbestand und verhält sich wie vor dem Personen-Feature (§4.6).
 
@@ -351,18 +352,25 @@ Jede Struktur trägt `version` für spätere Migrationen. Vor jedem Schreiben wi
 
 ### 4.6 Personen
 
-Zwei Menschen, eine Reise. Bisher war das nicht abbildbar: es gab **eine** Packliste pro Reise und keinen Begriff von Personen. Das Fundament dafür steht jetzt — die Unterschiede zwischen zwei Menschen sind genau zwei:
+Zwei Menschen, eine Reise. Bisher war das nicht abbildbar: es gab **eine** Packliste pro Reise und keinen Begriff von Personen. Das Fundament dafür steht jetzt — die Unterschiede zwischen zwei Menschen sind genau drei:
 
 | Unterschied | Wo er steht | Wie er wirkt |
 |---|---|---|
 | **Geschlecht** | an der Person, im globalen Register | als Katalog-Tag `Damen` / `Herren` (§5.1) |
 | **eigene Aktivitäten** | an der Person *in dieser Reise* (`teilnehmer`) | als ganz normale Aktivitäts-Tags |
+| **Reiseapotheke** | an der Person *in dieser Reise* (`teilnehmer`, 1.14) | als Katalog-Tag `Reiseapotheke` — **nicht** der Reise |
 
 **Personen sind ein globales Register**, keine Eigenschaft einer Reise: `daten.personen = [{ id, name, geschlecht }]`. Wer mitfährt, verweist über `person_id` darauf. Zweimal dieselbe Person auf zwei Reisen heißt also: zwei Verweise, ein Eintrag — das Geschlecht wird einmal gepflegt.
 
 **Aktivitäten sind reisebezogen.** Was jemand auf *dieser* Reise tut (Fotografie, Arbeit), steht am Teilnehmer, nicht an der Person. Sonst müsste man pro Reise doch wieder überschreiben. Ein späteres `person.standard_aktivitaeten` als Vorbelegung bleibt möglich und wäre additiv.
 
 **Wie das Geschlecht auf die Auswahl wirkt.** Der Katalog taggt geschlechtsspezifische Items — `Binden` trägt `Herren` in `nicht_mit`, `Badehose` ebenso. Die Person fügt ihrem Tag-Satz ihr Geschlechts-Tag hinzu; dadurch greift der Ausschluss bei der jeweils anderen Person. Die Begründung für diese Schreibweise steht in §5.1.
+
+**Die Reiseapotheke ist seit 1.14 eine Angabe je Person.** Bis dahin war sie ein Reise-Tag wie die Saison: sie stand einmal an der Reise und wanderte von dort in **jede** Personenliste. Bei zwei Mitfahrenden stand dieselbe 47-Item-Apotheke damit zweimal auf dem Zettel, obwohl sie einmal gepackt wird — wer sie mitnimmt, trägt sie ein, die andere Person hakt sie nicht ab. Das Formular zeigt den Schalter deshalb in der Personen-Zeile; er schreibt in `teilnehmer.reiseapotheke`, nicht in `reise.zusatz_tags`. Eine Reise **ohne** Teilnehmer behält den Schalter auf Reise-Ebene — sonst käme eine Solo-Reise gar nicht mehr an die Apotheke. Der Tag selbst bleibt im Vokabular (Anhang B.2): er ist ein echter Katalog-Tag, geändert hat sich nur, *wo* er angeboten wird.
+
+Diese eine Angabe deckt den Fall gemeinsamer Verbrauchsgüter allerdings nur für die Apotheke. FF-06 (unten) bleibt für alles übrige offen.
+
+Eine **alte** reiseweite Apotheke wird nicht migriert: wem sie gehören soll, ließe sich nur raten. Sie bleibt in `zusatz_tags` stehen und wirkt weiter auf alle Listen, bis die Reise Teilnehmer bekommt — dann erscheint sie als entfernbarer Chip unter „Zusätzliche Tags" mit dem Hinweis „gilt noch für die ganze Reise", und man hakt sie bei der Person an, die sie wirklich packt.
 
 **Zwei Listen, zwei Fortschritte.** Eine Reise mit zwei Teilnehmern hat zwei Packlisten, jede mit eigenem Abhak-Stand. Das ist keine Darstellungsfrage: wer gepackt hat, will wissen, ob *sein* Koffer fertig ist. Der Fortschritt einer Liste zählt nur ihre eigenen Häkchen, und die Startansicht zeigt eine Zeile je Person.
 
@@ -394,13 +402,18 @@ sortieren: Kategorien in fester Reihenfolge, Items alphabetisch
 
 `"Allgemein"` ist implizit in jeder Reise enthalten — das ist das Fundament, auf dem alles andere aufsetzt (Zahnbürste, Ladegerät, Reisepass). Es lässt sich nicht abwählen: in der Reihe der abgeleiteten Tags steht es zwar mit, aber nicht als Schalter, sondern still — kein Antippen, kein ↺.
 
-**Mit einer Person** kommt deren Geschlechts-Tag dazu, und ihre eigenen Aktivitäten:
+**Mit einer Person** kommen ihr Geschlechts-Tag, ihre eigenen Aktivitäten und ihre Reiseapotheke dazu:
 
 ```
-tripTagsFuerPerson = tripTags(reise) ∪ teilnehmer.aktivitaeten ∪ {Geschlechtstag}
+tripTagsFuerPerson = tripTags(reise) ∪ teilnehmer.aktivitaeten
+                                  ∪ {Reiseapotheke, falls angehakt} ∪ {Geschlechtstag}
 ```
 
-Die Aktivitäten der Person werden **nach** `entfernte_tags` hinzugefügt und gewinnen damit: sie sind die ausdrückliche Angabe dieser Person, ein Streichen an der Reise gilt für sie nicht. `Damen`/`Herren` stehen **nicht** in `TAG_GRUPPEN` — sie sind kein Reise-Kontext, sondern eine Personen-Eigenschaft, und tauchen deshalb in keinem Chip des Reise-Formulars auf.
+Die Aktivitäten der Person und ihre Reiseapotheke werden **nach** `entfernte_tags` hinzugefügt und gewinnen damit: sie sind die ausdrückliche Angabe dieser Person, ein Streichen an der Reise gilt für sie nicht. Die Apotheke kommt auf dieselbe Weise dazu wie eine Aktivität — sie ist eine Angabe am Teilnehmer, kein Reise-Tag (§4.6).
+
+Der Umkehrschluss gilt nicht: fehlt einer Person das Häkchen, verschwindet die Apotheke nur, wenn sie auch nicht in `zusatz_tags` der Reise steht. Eine **alte** reiseweite Apotheke wirkt weiter über `tripTags(reise)` auf alle Listen — sie ist Altbestand und muss an der Reise entfernt werden (§4.6). Eine stille Migration fände nicht statt; sie hieße, einer von zwei Personen die Apotheke zuzuschreiben.
+
+`Damen`/`Herren` stehen **nicht** in `TAG_GRUPPEN` — sie sind kein Reise-Kontext, sondern eine Personen-Eigenschaft, und tauchen deshalb in keinem Chip des Reise-Formulars auf.
 
 #### Das Geschlecht steht in `nicht_mit`, nicht in `tags`
 
@@ -525,6 +538,7 @@ Der Import endet mit einer Zusammenfassung: Anzahl importierter Items, Konflikte
 - [ ] Abgeleitete Tags sind sichtbar und einzeln entfernbar
 - [ ] Saison und Aktivitäten sind mehrfach wählbar — Winter + Regen bzw. Tauchen + Fotografie gleichzeitig (1.11)
 - [ ] Jeder Kontext ist ein Schalter aus dem festen Vokabular; kein Tag wird eingetippt (1.11)
+- [ ] Die Reiseapotheke steht an der Person, nicht an der Reise — sobald es Teilnehmer gibt (1.14)
 
 ### US-04 — Packliste erzeugen
 > Als Nutzerin möchte ich auf Knopfdruck eine Packliste bekommen, damit ich nicht mehr selbst auswähle.
@@ -769,8 +783,8 @@ Jede Person hat ihren eigenen Bestand. Voraussetzung dafür, dass Partner und Fr
 *Heute gilt ein gemeinsamer Katalog mit `im_besitz` — wer ein Item nicht besitzt, sieht es trotzdem.*
 
 **FF-05 · Geteilte Reisen mit Zuständigkeiten**
-Eine Reise, mehrere Personen, pro Item eine Zuordnung "wer bringt das mit". Löst das Doppelt-Packen von Dingen, die nur einmal gebraucht werden (Föhn, Reiseapotheke, Tauchlampe).
-*Fundament steht (§4.6): Personen, Teilnehmer und getrennte Listen gibt es. Offen ist die Zuordnung selbst — sie setzt eine gemeinsame Sicht auf beide Listen voraus, und die gibt es noch nicht.*
+Eine Reise, mehrere Personen, pro Item eine Zuordnung "wer bringt das mit". Löst das Doppelt-Packen von Dingen, die nur einmal gebraucht werden (Föhn, Tauchlampe).
+*Fundament steht (§4.6): Personen, Teilnehmer und getrennte Listen gibt es. Offen ist die Zuordnung selbst — sie setzt eine gemeinsame Sicht auf beide Listen voraus, und die gibt es noch nicht. Für die Reiseapotheke ist der Fall seit 1.14 auf eigene Weise gelöst: sie ist eine Angabe je Person (§4.6), nicht mehr der Reise — die Apotheke selbst bleibt aber ein Fall für die Zuordnung.*
 
 **FF-06 · Gemeinsame Verbrauchsgüter**
 Sonnencreme, Shampoo: eine Person bringt, alle nutzen. Verbindet sich mit FF-05.
@@ -861,13 +875,15 @@ Gespeichert als flache Strings; gruppiert nur für die Darstellung im Formular.
 
 `Damen` und `Herren` stehen bewusst **nicht** in der Tabelle der Reise-Kontexte: sie gehören zu einer Person, nicht zu einer Reise. Sie stehen in `PERSON_TAGS` und tauchen in keinem Chip des Reise-Formulars auf. Im Katalog wirken sie ausschließlich in `nicht_mit` — die Begründung steht in §5.1.
 
+`Reiseapotheke` bleibt in der Gruppe **Basis** — es ist ein echter Katalog-Tag und `BEKANNTE_TAGS` soll ihn kennen. Seit 1.14 ist er nur keine Reise-Angabe mehr: das **Formular** bietet ihn in der Zeile jeder Person an (§4.6), auf Reise-Ebene nur bei Reisen ohne Teilnehmer. Die Gruppe im Vokabular sagt, *wozu* der Tag gehört; sie sagt nicht mehr, *wer* ihn wählt.
+
 Eine **Anlass**-Gruppe entfällt ersatzlos.
 
 **Begründungen zu den neu vorgeschlagenen Tags**
 
 | Tag | Warum |
 |---|---|
-| **Reiseapotheke** | Hat die Kategorie `Medizin` von `Allgemein` gelöst. Die 47 Medizin-Items waren ein Drittel jeder Packliste (47 von 151 Positionen auf einer typischen Reise) — eine Reiseapotheke packt man aber nicht in dieser Breite ein. Der Tag steht unter **Basis**, weil er wie `Allgemein` die Grundausstattung beschreibt, nicht einen Anlass |
+| **Reiseapotheke** | Hat die Kategorie `Medizin` von `Allgemein` gelöst. Die 47 Medizin-Items waren ein Drittel jeder Packliste (47 von 151 Positionen auf einer typischen Reise) — eine Reiseapotheke packt man aber nicht in dieser Breite ein. Der Tag steht unter **Basis**, weil er wie `Allgemein` die Grundausstattung beschreibt, nicht einen Anlass. Seit 1.14 wird er **je Person** gewählt (§4.6): er beschreibt Grundausstattung, aber nicht die jeder Person — sie wird einmal gepackt |
 | **Übergangszeit** | Zwischen Winter und Sommer liegt der Großteil der Reisen. Ohne diesen Tag gibt es für milde Reisen keine saubere Auswahl — man landet bei Winter oder Sommer und packt falsch |
 | **Regen** | Regenjacke, Schirm, wasserdichte Schuhe. Trifft jede Jahreszeit und ist unabhängig von der Saison — deshalb ist `saison` seit 1.11 eine **Mehrfachauswahl**: `Regen` tritt neben die Jahreszeit, statt sie zu ersetzen. Vorher war der Tag nicht erreichbar: er stand in der Gruppe, aber nicht in der Auswahlliste |
 | **Flugzeug** | Ausdrücklicher Wunsch. Ersetzt jedes Verkehrsmittel-Regelwerk durch Tags (§4.3). `Auto` und `Zug` standen daneben und sind in 1.13 entfallen — sie trugen kein Item, ein Umstieg auf die Bahn hätte an der Liste nichts geändert |
@@ -923,6 +939,7 @@ Dabei entstehen zwei Lücken, die der Import-Report (F7) ausweisen muss:
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 1.14 | 2026-10-09 | **Die Reiseapotheke wird eine Angabe je Person.** Sie war ein Reise-Tag wie die Saison und wanderte von `reise.zusatz_tags` in **jede** Personenliste: bei zwei Mitfahrenden stand dieselbe 47-Item-Apotheke zweimal auf dem Zettel, obwohl sie einmal gepackt wird. Neues Feld `teilnehmer.reiseapotheke` (boolesch), das die Engine in `tripTagsFuerPerson` wie eine eigene Aktivität der Person hinzufügt — also **nach** `entfernte_tags`, wo die ausdrückliche Angabe einer Person gewinnt. Das Reise-Formular zeigt den Schalter in der Zeile jeder Person und lässt ihn in „Basis" nur stehen, **solange es keine Teilnehmer gibt** — sonst käme eine Solo-Reise nicht mehr an die Apotheke. Der Tag selbst bleibt in `TAG_GRUPPEN` (47 Items tragen ihn, `BEKANNTE_TAGS` soll ihn kennen); geändert hat sich nur, *wo* er angeboten wird. Eine **alte** reiseweite Apotheke wird nicht migriert — wem sie gehören soll, ließe sich nur raten. Sie wirkt weiter auf alle Listen, bis die Reise Teilnehmer bekommt, und erscheint dann als entfernbarer Chip unter „Zusätzliche Tags" mit dem Hinweis „gilt noch für die ganze Reise"; `normalisiereDaten` füllt fehlende Werte überall zu `false` auf, `validiereDaten` prüft den Wahrheitswert. **Dazu ein gefundener Fehler, der über dieses Feature hinausgeht:** die beiden Erzeugen-Knöpfe in `ansichtListe.js` gaben der Engine `{ t, person }` statt `{ person, teilnehmer }` — der Teilnehmer-Eintrag kam als `undefined` an, und einer Person fehlten beim (Neu-)Erzeugen **schon vorher** ihre eigenen Aktivitäten. Wer eine Liste neu erzeugte, verlor sie stillschweigend; die Kopfzeile zeigte sie weiterhin an |
 | 1.13 | 2026-10-09 | **`Auto`, `Zug` und `Freunde` entfallen.** Alle drei standen im Vokabular (Anhang B.2) und trugen kein einziges Item: eine Auswahl hätte an keiner Packliste etwas geändert, sie hat nur etwas versprochen — `Freunde` sogar ausdrücklich („Geschenk, kein Handtuch nötig"). `Hotel` bleibt, obwohl auch dort heute kein Item hängt: die Begründung in Anhang B.2 steht (Handtuch und Föhn werden bewusst *nicht* mit `Hotel` getaggt, §4.3), und das ist eine Katalogfrage, kein Vokabularfehler. `VERKEHRSMITTEL` und `UNTERKUNFT` werden jetzt wie `SAISONS` aus `TAG_GRUPPEN` **abgeleitet**; die handgeschriebenen Kopien waren dieselbe Fehlerquelle, die `Regen` unerreichbar gemacht hatte (1.11). Damit die Einzelauswahlen sich wie die Mehrfachauswahlen verhalten, zeigt das Formular einen Wert außerhalb des Vokabulars — Altbestand oder zweites Gerät mit alter Version — als entfernbaren Chip, statt ihn nur im Speicher zu lassen |
 | 1.12 | 2026-10-09 | **`Übergangszeit` greift jetzt an der Kleidung.** `Dünne Jacke` und `Dünner Schal` hingen nur an `Winter` — eine milde Reise brachte damit 83 Items und **keine Jacke** außer der `Regenjacke`, obwohl Anhang B.2 den Tag genau dafür eingeführt hat („für milde Reisen keine saubere Auswahl"). Beide tragen jetzt `Winter` **und** `Übergangszeit`: im Winter bleiben sie, in der Übergangszeit kommen sie neu dazu. 85 statt 83 Items auf einer milden Reise. Das ist kein `nicht_mit`-Fall, sondern ein fehlender positiver Tag (§5.3) |
 | 1.11 | 2026-10-09 | **Tags werden nur noch gewählt, `Regen` wird ein Klima-Tag — und `saison` eine Mehrfachauswahl.** Die drei Freitextfelder im Reise-Formular fallen weg: unter „Aktivitäten", unter „Zusätzliche Tags" und in jeder Personenzeile, samt Vorschlagsliste. Sie versprachen, einen neuen Tag anzulegen, wirkten aber nur, wenn der Katalog den Tag bereits exakt so trug — und da *jeder* im Katalog benutzte Tag ohnehin in `TAG_GRUPPEN` stand, war der Nutzen null und die Verwirrung real: drei Felder, zwei Ziele (`aktivitaeten` vs. `zusatz_tags`), ein gemeinsamer Vorschlagsvorrat. Ein neuer Kontext ist eine Katalogänderung; **F8 und FR5 entfallen** (beide P0). `Regen` war bis dahin unerreichbar: er stand in der Gruppe „Klima / Saison" (Anhang B.2) und wurde von `Gummistiefel` und `Schirm` getragen, aber `SAISONS` zählte nur drei Werte auf — man kam nur über den Freitext an ihn. `SAISONS` wird jetzt wie `AKTIVITAETEN` und `BASIS_TAGS` aus `TAG_GRUPPEN` **abgeleitet**, damit Vokabular und Gruppe nicht mehr auseinanderlaufen können. Wäre `Regen` ein vierter Schalter unter Entweder-oder-Bedingungen, würde er die Jahreszeit *ersetzen*: auf einer verregneten Winterreise fiele die Winter-Auswahl weg. Deshalb ist **`saison` eine Mehrfachauswahl** (`["Winter", "Regen"]`) — das PRD begründet den Tag ohnehin als „unabhängig von der Saison". Der Altwert als einzelner String bleibt lesbar (`saisonListe` in der Engine); die Migration liegt in `normalisiereDaten`, durch das Laden, Import und Sync-Merge ohnehin alle laufen. Ein Wert außerhalb des Vokabulars — Altbestand oder ein zweites Gerät mit alter Version — bleibt als entfernbarer Chip sichtbar, sonst wäre er unsichtbar und unlöschbar. Katalogseitig hat 1.10 (`Städtetrip` entfällt) `Schirm` auf `Camping`/`Regen` verengt — seitdem führt an Schirm und Gummistiefeln ohne Camping nur noch `Regen` vorbei, weshalb der Tag nicht länger im toten Winkel stehen darf |

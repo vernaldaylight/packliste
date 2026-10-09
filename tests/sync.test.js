@@ -290,7 +290,12 @@ test('schiebeReisen schreibt Personen und beide Listen zweier Personen mit', asy
 
   const drueben = JSON.parse(dekodiereBase64(JSON.parse(aufrufe[0].body).content));
   assert.deepEqual(drueben.personen, daten.personen);
-  assert.deepEqual(drueben.reisen[0].teilnehmer, daten.reisen[0].teilnehmer);
+  // Die Teilnehmer gehen vollständig hinaus — mit aufgefülltem `reiseapotheke`
+  // (1.14), das die Eingabe nicht gesetzt hatte.
+  assert.deepEqual(drueben.reisen[0].teilnehmer, [
+    { person_id: 'p1', reiseapotheke: false },
+    { person_id: 'p2', reiseapotheke: false },
+  ]);
   assert.deepEqual(drueben.packlisten.map((p) => p.person_id), ['p1', 'p2']);
 });
 

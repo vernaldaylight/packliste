@@ -169,6 +169,13 @@
         pruefe('Flugzeug ist der Verkehrsmittel-Schalter', chipTexte.includes('Flugzeug'));
         pruefe('Hotel bleibt wählbar', chipTexte.includes('Hotel'));
 
+        // Die Reiseapotheke ist seit 1.14 eine Angabe je Person. Solange die
+        // Reise keine Teilnehmer hat, bleibt sie der Schalter in „Basis" —
+        // sonst käme eine Reise ohne Personen gar nicht mehr an sie.
+        const basisKarte = () => [...app.querySelectorAll('.karte')].find((k) => k.querySelector('.karte-titel')?.textContent === 'Basis');
+        const basisChips = () => [...(basisKarte()?.querySelectorAll('.chip-schalter') ?? [])].map((c) => c.textContent);
+        pruefe('ohne Personen: Apotheke ist ein Reise-Schalter', basisChips().includes('Reiseapotheke'));
+
         // Tags werden nicht mehr eingetippt (1.10) — dafür ist Saison eine
         // Mehrfachauswahl. Der Bestand oben trägt `saison` noch als String
         // ('Sommer'); er muss als gewählter Chip ankommen.
@@ -220,6 +227,23 @@
         // „Neue Person …".
         pruefe('kein „null" im Formular', !/\b(null|undefined)\b/.test(app.textContent));
 
+        // Mit Teilnehmern wechselt die Apotheke die Seite: aus „Basis" heraus in
+        // jede Personenzeile — je Person ein eigener Schalter (1.14).
+        pruefe('mit Personen: kein Apotheken-Schalter in „Basis"', !basisChips().includes('Reiseapotheke'));
+        const apothekeIn = (name) => {
+          const zeile = [...app.querySelectorAll('.person-zeile')].find(
+            (z) => z.querySelector('input[type=text]')?.value === name
+          );
+          return [...zeile.querySelectorAll('.chip-schalter')].find((c) => c.textContent === 'Reiseapotheke');
+        };
+        pruefe('jede Personenzeile hat den Apotheken-Schalter', Boolean(apothekeIn('Anna')) && Boolean(apothekeIn('Ben')));
+        pruefe('sie ist zunächst aus', !apothekeIn('Anna').classList.contains('ist-an'));
+
+        apothekeIn('Anna').click();
+        await warte();
+        pruefe('Annas Apotheke ist an', apothekeIn('Anna').classList.contains('ist-an'));
+        pruefe('Bens Apotheke bleibt aus', !apothekeIn('Ben').classList.contains('ist-an'));
+
         const erzeugeListen = knopfMit(app, 'Liste neu erzeugen');
         pruefe('Knopf „Liste neu erzeugen" vorhanden', Boolean(erzeugeListen));
         erzeugeListen?.click();
@@ -245,6 +269,7 @@
         pruefe('Anna hat kein Badehose', !namenAufListe().includes('Badehose'));
         pruefe('Anna hat die Kamera', namenAufListe().includes('Kamera'));
         pruefe('Anna hat keinen Laptop', !namenAufListe().includes('Laptop'));
+        pruefe('Anna hat die Reiseapotheke', namenAufListe().includes('Reiseapotheke-Set'));
         const annaFortschritt = text().match(/(\d+) von (\d+) gepackt/)?.[2];
 
         await wechsle('Ben');
@@ -254,6 +279,8 @@
         pruefe('Ben hat keinen Bikini', !namenAufListe().includes('Bikini'));
         pruefe('Ben hat den Laptop', namenAufListe().includes('Laptop'));
         pruefe('Ben hat keine Kamera', !namenAufListe().includes('Kamera'));
+        // Einmal packen, nicht zweimal: die Apotheke steht nur auf Annas Liste.
+        pruefe('Ben hat keine Reiseapotheke', !namenAufListe().includes('Reiseapotheke-Set'));
 
         // Der Fortschritt gehört zur Liste: ein Häkchen bei Ben zählt nicht bei Anna.
         app.querySelectorAll('.haken')[0].click();
@@ -267,6 +294,20 @@
         location.hash = '#/liste/smoke-1';
         await warte();
         pruefe('alte Listen-Adresse leitet auf die erste Person', text().includes('Liste für Anna'));
+
+        // Neu erzeugen aus der **Listenansicht** muss die Person mitnehmen. Hier
+        // stand `{ person, teilnehmer }` falsch zusammen: der Teilnehmer-Eintrag
+        // kam als `undefined` an, und die eigenen Aktivitäten der Person fielen
+        // weg — die Liste wurde still wieder zur Reise-Liste.
+        window.confirm = () => true;
+        await wechsle('Ben');
+        pruefe('Bens Liste offen', text().includes('Liste für Ben'));
+        knopfMit(app, 'Liste neu erzeugen')?.click();
+        await warte();
+        pruefe('nach dem Neu-Erzeugen: Bens eigene Aktivität bleibt', namenAufListe().includes('Laptop'));
+        pruefe('und seine Reiseapotheke bleibt aus', !namenAufListe().includes('Reiseapotheke-Set'));
+        await wechsle('Anna');
+        pruefe('Annas Apotheke überlebt das Neu-Erzeugen', namenAufListe().includes('Reiseapotheke-Set'));
 
         /* 9 — Katalogansicht (US-09, US-10) */
         location.hash = '#/katalog';

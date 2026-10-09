@@ -12,9 +12,10 @@
  * ist das Fundament jeder Reise, steht in der Reihe der abgeleiteten Tags und
  * lässt sich nicht streichen.
  *
- * Die Basis-Tags stehen in einer eigenen Karte. `Reiseapotheke` ist dort ein
- * normaler Schalter — die Kategorie `Medizin` hängt an ihm, nicht an `Allgemein`,
- * und ohne diese Karte wäre er im Formular gar nicht wählbar.
+ * Die Basis-Karte zeigt die Reiseapotheke als Schalter — aber nur, solange die
+ * Reise **keine** Teilnehmer hat. Sie gehört seit 1.14 zur Person (PRD §4.6) und
+ * steht sonst in jeder Personenzeile; ohne Teilnehmer gäbe es sonst gar keinen
+ * Weg zu ihr. Die Kategorie `Medizin` hängt an diesem Tag, nicht an `Allgemein`.
  *
  * Saison und Aktivitäten sind **Mehrfachauswahlen** aus dem festen Vokabular
  * der Tag-Gruppen (engine.js, TAG_GRUPPEN). Seit 1.10 wird kein Tag mehr
@@ -36,6 +37,7 @@ import {
   VERKEHRSMITTEL,
   UNTERKUNFT,
   BASIS_TAG,
+  REISEAPOTHEKE_TAG,
   WAHLBARE_BASIS_TAGS,
 } from '../engine.js';
 
@@ -64,8 +66,13 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
     zusatz_tags: [...(vorhandene?.zusatz_tags ?? [])],
     entfernte_tags: [...(vorhandene?.entfernte_tags ?? [])],
     // Wer mitfährt, ist eine Eigenschaft der Reise; das Geschlecht eine der
-    // Person (PRD §4.6). Hier steht deshalb nur die Verknüpfung.
-    teilnehmer: (vorhandene?.teilnehmer ?? []).map((t) => ({ ...t, aktivitaeten: [...(t.aktivitaeten ?? [])] })),
+    // Person (PRD §4.6). Hier steht deshalb nur die Verknüpfung — dazu, was
+    // diese Person auf dieser Reise eigenes hat: Aktivitäten und Apotheke.
+    teilnehmer: (vorhandene?.teilnehmer ?? []).map((t) => ({
+      ...t,
+      aktivitaeten: [...(t.aktivitaeten ?? [])],
+      reiseapotheke: t.reiseapotheke === true,
+    })),
   };
 
   /** Ein Eintrag für jede erzeugte Liste — eine Reise kann mehrere haben. */
@@ -210,10 +217,13 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
       ),
     });
 
-    // Basis: Allgemein liegt fest, die Reiseapotheke ist ein Schalter
+    // Basis: `Allgemein` liegt fest. Die Reiseapotheke ist seit 1.14 eine Angabe
+    // je Person und steht deshalb nur hier, solange es keine Teilnehmer gibt —
+    // sonst wäre sie für eine Reise ohne Personen überhaupt nicht wählbar.
+    const basisSchalter = entwurf.teilnehmer.length === 0 ? WAHLBARE_BASIS_TAGS : [];
     basisAnzeige.replaceChildren(
       h('span', { class: 'chip chip-fix', title: `${BASIS_TAG} ist immer dabei` }, BASIS_TAG),
-      ...WAHLBARE_BASIS_TAGS.map((t) => {
+      ...basisSchalter.map((t) => {
         const an = entwurf.zusatz_tags.includes(t);
         return h(
           'button',
@@ -233,17 +243,35 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
       })
     );
 
-    // Zusatz-Tags (frei eingetippt) — ohne die Basis-Tags, die oben ihren Schalter haben
-    const eigeneTags = entwurf.zusatz_tags.filter((t) => !WAHLBARE_BASIS_TAGS.includes(t));
+    // Altbestand an Zusatz-Tags: Werte, die der Katalog nicht kennt und die
+    // seit 1.11 nicht mehr eingetippt werden können. Gibt es keinen, fällt der
+    // ganze Block samt Überschrift weg — ein „noch keine" erklärt nichts.
+    //
+    // Verglichen wird mit den Schaltern, die gerade **wirklich** dastehen: hat
+    // die Reise Teilnehmer, ist die alte reiseweite Reiseapotheke hier oben
+    // kein Schalter mehr — sie bliebe sonst unsichtbar auf allen Listen aktiv.
+    const eigeneTags = entwurf.zusatz_tags.filter((t) => !basisSchalter.includes(t));
     zusatzAnzeige.replaceChildren(
       ...(eigeneTags.length === 0
-        ? [h('span', { class: 'klein' }, 'noch keine')]
-        : eigeneTags.map((t) =>
-            entfernbarerChip(t, () => {
-              entwurf.zusatz_tags = entwurf.zusatz_tags.filter((x) => x !== t);
-              aktualisiere();
-            })
-          ))
+        ? []
+        : [
+            h('h3', { class: 'unter-titel' }, 'Zusätzliche Tags'),
+            h(
+              'div',
+              { class: 'tag-reihe' },
+              ...eigeneTags.map((t) =>
+                entfernbarerChip(t, () => {
+                  entwurf.zusatz_tags = entwurf.zusatz_tags.filter((x) => x !== t);
+                  aktualisiere();
+                })
+              ),
+              // Als Liste, nicht als `null`: `replaceChildren` macht aus `null`
+              // einen Textknoten „null" (siehe dom.js / ansichtListe.js).
+              ...(entwurf.teilnehmer.length > 0
+                ? [h('span', { class: 'klein' }, 'gilt noch für die ganze Reise')]
+                : [])
+            ),
+          ])
     );
 
     // Abgeleitete Tags: sichtbar, einzeln entfernbar (US-03). Allgemein steht
@@ -319,6 +347,28 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
         ),
       });
 
+      // Die Reiseapotheke gehört seit 1.14 zur Person (PRD §4.6) — sie steht
+      // deshalb in einer eigenen Zeile und nicht bei den Aktivitäten: sie ist
+      // keine. Der Schalter kommt zu den Reise-Tags dieser Person dazu.
+      const apotheke = h(
+        'div',
+        { class: 'tag-reihe' },
+        h('span', { class: 'klein' }, `${REISEAPOTHEKE_TAG}:`),
+        h(
+          'button',
+          {
+            type: 'button',
+            class: `chip chip-schalter${t.reiseapotheke ? ' ist-an' : ''}`,
+            'aria-pressed': String(Boolean(t.reiseapotheke)),
+            onclick: () => {
+              t.reiseapotheke = !t.reiseapotheke;
+              aktualisiere();
+            },
+          },
+          REISEAPOTHEKE_TAG
+        )
+      );
+
       return h(
         'div',
         { class: 'person-zeile' },
@@ -356,7 +406,8 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
           { class: 'tag-reihe' },
           h('span', { class: 'klein' }, person.name ? `Zusätzlich für ${person.name}:` : 'Zusätzlich:'),
           aktivitaeten
-        )
+        ),
+        apotheke
       );
     });
 
@@ -372,7 +423,9 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
                   type: 'button',
                   class: 'knopf',
                   onclick: () => {
-                    entwurf.teilnehmer.push({ person_id: p.id, aktivitaeten: [] });
+                    // Dieselbe Form wie im Entwurf und im Bestand — sonst fehlte dem
+                    // frisch Hinzugefügten das Feld, das der Schalter umlegt.
+                    entwurf.teilnehmer.push({ person_id: p.id, aktivitaeten: [], reiseapotheke: false });
                     aktualisiere();
                   },
                 },
@@ -398,7 +451,7 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
    */
   const neuePersonFeld = freitextFeld('Neue Person …', (name) => {
     const person = aktionen.legePersonAn({ name });
-    entwurf.teilnehmer.push({ person_id: person.id, aktivitaeten: [] });
+    entwurf.teilnehmer.push({ person_id: person.id, aktivitaeten: [], reiseapotheke: false });
   });
 
   /* --- Speichern ---------------------------------------------------------- */

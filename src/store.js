@@ -232,6 +232,10 @@ export function katalogBackupVorhanden() {
  * `saison` wandert hier von einem einzelnen String auf eine Liste (1.10). Weil
  * Laden, Datei-Import und Sync-Merge alle durch diese Funktion laufen, ist das
  * die einzige Stelle, an der die alte Form ankommen kann.
+ *
+ * `reiseapotheke` am Teilnehmer (1.14) bekommt hier seine Form: fehlt das Feld,
+ * wird daraus `false`. Nur die Form — wem eine früher reiseweite Apotheke
+ * gehören soll, wird nicht geraten.
  */
 export function normalisiereDaten(roh) {
   return {
@@ -239,7 +243,11 @@ export function normalisiereDaten(roh) {
     personen: Array.isArray(roh?.personen) ? roh.personen : [],
     reisen: (Array.isArray(roh?.reisen) ? roh.reisen : []).map((r) => ({
       ...r,
-      teilnehmer: Array.isArray(r?.teilnehmer) ? r.teilnehmer : [],
+      teilnehmer: (Array.isArray(r?.teilnehmer) ? r.teilnehmer : []).map((t) => ({
+        ...t,
+        // 1.14: Die Reiseapotheke ist eine Angabe je Person (PRD §4.6).
+        reiseapotheke: t?.reiseapotheke === true,
+      })),
       // 1.10: `saison` ist eine Mehrfachauswahl (PRD §4.3). Im Altbestand steht
       // dort ein einzelner String oder nichts — `saisonListe` macht daraus eine.
       saison: saisonListe(r?.saison),
@@ -321,6 +329,13 @@ export function validiereDaten(rohdaten) {
     }
     for (const [j, t] of (Array.isArray(r?.teilnehmer) ? r.teilnehmer : []).entries()) {
       if (!t?.person_id) fehler.push(`Reise #${i + 1} (${r?.name ?? '?'}), Teilnehmer #${j + 1}: person_id fehlt.`);
+      // 1.14: Die Reiseapotheke ist ein Wahrheitswert. Fehlen darf er (Altbestand),
+      // aber ein handgeschriebenes "ja" wäre sonst still wahr.
+      if (t?.reiseapotheke !== undefined && t.reiseapotheke !== null && typeof t.reiseapotheke !== 'boolean') {
+        fehler.push(
+          `Reise #${i + 1} (${r?.name ?? '?'}), Teilnehmer #${j + 1}: reiseapotheke ist kein Wahrheitswert.`
+        );
+      }
     }
   }
 

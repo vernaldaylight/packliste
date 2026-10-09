@@ -76,7 +76,7 @@ export function ansichtListe({ katalog, daten, aktionen, reiseId, personId = nul
           {
             class: 'knopf knopf-haupt',
             onclick: () => {
-              aktionen.setzePackliste(reise.id, personIdAktiv, erzeugePackliste(katalog, reise, aktiv ?? {}));
+              aktionen.setzePackliste(reise.id, personIdAktiv, erzeugePackliste(katalog, reise, aktiv ? { person: aktiv.person, teilnehmer: aktiv.t } : {}));
               aktionen.melde('Liste erzeugt.', 'ok');
               aktionen.render();
             },
@@ -212,7 +212,7 @@ export function ansichtListe({ katalog, daten, aktionen, reiseId, personId = nul
             onclick: () => {
               const wem = aktiv ? ` von ${aktiv.person.name}` : ' dieser Reise';
               if (!confirm(`Die Liste${wem} neu erzeugen? Häkchen und alle Nachjustierungen gehen verloren.`)) return;
-              aktionen.setzePackliste(reise.id, personIdAktiv, erzeugePackliste(katalog, reise, aktiv ?? {}));
+              aktionen.setzePackliste(reise.id, personIdAktiv, erzeugePackliste(katalog, reise, aktiv ? { person: aktiv.person, teilnehmer: aktiv.t } : {}));
               aktionen.melde('Liste neu erzeugt.', 'ok');
               aktionen.render();
             },

@@ -159,12 +159,14 @@ Taschen & Ordnung        Verpflegung     Haushalt & Sonstiges
 
 | Gruppe | Tags |
 |---|---|
-| Basis | `Allgemein`, `Reiseapotheke` |
+| Basis | `Allgemein`, `Reiseapotheke`¹ |
 | Klima / Saison | `Winter`, `Sommer`, `Übergangszeit`, `Regen` |
 | Verkehrsmittel | `Flugzeug` |
 | Aktivität | `Tauchen`, `Festival`, `Wandern`, `Strand`, `Ski`, `Arbeit`, `Fotografie`, `UW-Fotografie` |
 | Unterkunft | `Camping`, `Ferienwohnung`, `Hotel`, `Hostel` |
 | Person | `Damen`, `Herren` — **nur** in `nicht_mit`, siehe unten |
+
+¹ `Reiseapotheke` ist ein gewöhnlicher Katalog-Tag, aber **keine gewöhnliche Reise-Angabe**: die App bietet ihn in der Zeile jeder Person an, denn die Apotheke wird einmal gepackt und nicht für jeden Mitfahrenden einzeln. Eine Reise **ohne** Teilnehmer behält den Schalter in „Basis" (als einzigen neben `Allgemein`). Alte Reisen, die ihn noch auf Reise-Ebene tragen, wirken damit weiter auf alle Listen; sobald eine Person dazukommt, erscheint der Wert als entfernbarer Chip unter „Zusätzliche Tags" mit dem Hinweis „gilt noch für die ganze Reise". Wird die Teilnehmerliste später wieder geleert („Nicht dabei"), ist der Reise-Schalter wieder da, steht aber auf **aus** — die Apotheke muss für die Solo-Liste neu angehakt werden. Und wie jeder Tag gilt: ein Umlegen ändert eine schon erzeugte Liste nicht, sie will neu erzeugt werden.
 
 **`menge`** — drei Formen:
 
