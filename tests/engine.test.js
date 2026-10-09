@@ -23,15 +23,42 @@ import {
   reisetage,
   mengeFuer,
   tripTags,
+  tripTagsFuerPerson,
+  personTags,
   passtZuReise,
   erzeugePackliste,
+  erzeugePacklisten,
   gruppiere,
   fortschritt,
   alsMarkdown,
   KATEGORIEN,
+  BEKANNTE_TAGS,
+  PERSON_TAGS,
+  GESCHLECHT_TAGS,
 } from '../src/engine.js';
 
 const HIER = dirname(fileURLToPath(import.meta.url));
+
+/** Der synthetische Katalog — klein genug, um jede Auswahl von Hand nachzuzählen. */
+const SPIELZEUG = JSON.parse(readFileSync(resolve(HIER, 'fixtures/katalog.synthetisch.json'), 'utf8'));
+
+/** Die zwei Personen der Tests: eine weibliche, eine männliche, mit je eigener Aktivität. */
+const ANNA = { id: 'p-anna', name: 'Anna', geschlecht: 'weiblich' };
+const BEN = { id: 'p-ben', name: 'Ben', geschlecht: 'maennlich' };
+
+const REISE = {
+  id: 'r-personen',
+  name: 'Tauchurlaub',
+  von: '2026-08-01',
+  bis: '2026-08-10',
+  saison: 'Sommer',
+  aktivitaeten: ['Tauchen'],
+  verkehrsmittel: 'Flugzeug',
+  unterkunft: 'Ferienwohnung',
+};
+
+/** Die item_ids einer erzeugten Liste — für Vergleiche in Mengenform. */
+const ids = (liste) => new Set(liste.positionen.map((p) => p.item_id));
 
 /**
  * Die private Arbeitskopie, falls sie auf dieser Maschine liegt — sonst `null`,
@@ -170,6 +197,175 @@ test('nicht_mit schlägt einen positiven Tag-Treffer (PRD §5.3)', () => {
 test('ein Item ohne Tags wird nie ausgewählt', () => {
   assert.ok(!passtZuReise({ tags: [] }, new Set(['Allgemein'])));
   assert.ok(!passtZuReise({}, new Set(['Allgemein'])));
+});
+
+/* --- Personen (PRD §4.6) --------------------------------------------------- */
+
+test('Damen/Herren sind kein Reise-Tag: sie stehen in keinem Chip-Vokabular (O14)', () => {
+  for (const t of PERSON_TAGS) {
+    assert.ok(!BEKANNTE_TAGS.includes(t), `"${t}" darf nicht in TAG_GRUPPEN stehen — sonst wäre es ein Reise-Chip`);
+  }
+  // Und die Gegenrichtung: was in TAG_GRUPPEN steht, ist kein Personen-Tag.
+  assert.deepEqual(PERSON_TAGS.filter((t) => BEKANNTE_TAGS.includes(t)), []);
+});
+
+test('personTags liefert genau das Geschlechts-Tag', () => {
+  assert.deepEqual([...personTags(ANNA)], [GESCHLECHT_TAGS.weiblich]);
+  assert.deepEqual([...personTags(BEN)], [GESCHLECHT_TAGS.maennlich]);
+});
+
+test('personTags ist leer ohne Geschlecht und ohne Person', () => {
+  assert.deepEqual([...personTags({ id: 'x', name: 'Ohne' })], []);
+  assert.deepEqual([...personTags({ id: 'x', geschlecht: '' })], []);
+  assert.deepEqual([...personTags({ id: 'x', geschlecht: 'divers' })], [], 'unbekanntes Geschlecht ergibt kein Tag');
+  assert.deepEqual([...personTags(null)], []);
+  assert.deepEqual([...personTags(undefined)], []);
+});
+
+test('tripTagsFuerPerson = Reise-Tags ∪ Personen-Aktivitäten ∪ Geschlecht', () => {
+  const teilnehmer = { person_id: ANNA.id, aktivitaeten: ['Fotografie'] };
+  const tags = tripTagsFuerPerson(REISE, teilnehmer, ANNA);
+
+  assert.deepEqual(
+    [...tags].sort(),
+    ['Allgemein', 'Damen', 'Ferienwohnung', 'Flugzeug', 'Fotografie', 'Sommer', 'Tauchen'].sort()
+  );
+  // Die Reise-Aktivitäten bleiben: die Person fügt hinzu, sie ersetzt nicht.
+  assert.ok(tags.has('Tauchen'));
+});
+
+test('die Aktivitäten der einen Person landen nicht bei der anderen', () => {
+  const anna = tripTagsFuerPerson(REISE, { person_id: ANNA.id, aktivitaeten: ['Fotografie'] }, ANNA);
+  const ben = tripTagsFuerPerson(REISE, { person_id: BEN.id, aktivitaeten: ['Arbeit'] }, BEN);
+
+  assert.ok(anna.has('Fotografie') && !anna.has('Arbeit'));
+  assert.ok(ben.has('Arbeit') && !ben.has('Fotografie'));
+  assert.ok(anna.has('Damen') && !anna.has('Herren'));
+  assert.ok(ben.has('Herren') && !ben.has('Damen'));
+});
+
+test('ohne Teilnehmer-Eintrag bleibt es bei den Reise-Tags plus Geschlecht', () => {
+  const tags = tripTagsFuerPerson(REISE, null, ANNA);
+  assert.ok(tags.has('Damen'));
+  assert.ok(tags.has('Tauchen'));
+  assert.deepEqual([...tags].sort(), [...tripTags(REISE), 'Damen'].sort());
+});
+
+test('Personen-Aktivitäten gewinnen gegen entfernte_tags der Reise', () => {
+  // Die Reise hat Fotografie gestrichen; die Person sagt ausdrücklich, dass sie
+  // sie braucht. Ihre Angabe steht näher an ihr als das Streichen an der Reise.
+  const reise = { ...REISE, aktivitaeten: ['Tauchen', 'Fotografie'], entfernte_tags: ['Fotografie'] };
+  assert.ok(!tripTags(reise).has('Fotografie'), 'Vorbedingung: die Reise hat es gestrichen');
+
+  const tags = tripTagsFuerPerson(reise, { person_id: ANNA.id, aktivitaeten: ['Fotografie'] }, ANNA);
+  assert.ok(tags.has('Fotografie'), 'die Person holt ihre eigene Aktivität zurück');
+});
+
+/* --- Auswahl je Person ----------------------------------------------------- */
+
+test('erzeugePackliste ohne Optionen lässt die Geschlechts-Items stehen', () => {
+  // Eine Liste ohne Person hat kein Geschlechts-Tag — also greift auch kein
+  // `nicht_mit` und es kommt, was zur Reise passt. Das ist der Altbestand: eine
+  // Ein-Personen-Liste von vor dem Feature bekommt eher zu viel als zu wenig.
+  const liste = erzeugePackliste(SPIELZEUG, REISE);
+  assert.equal(liste.person_id, null);
+  assert.ok(ids(liste).has('binden'));
+  assert.ok(ids(liste).has('bikini'));
+  assert.ok(ids(liste).has('badehose'));
+  // Was an einer Aktivität hängt, bleibt trotzdem draußen.
+  assert.ok(!ids(liste).has('kamera'));
+  assert.ok(!ids(liste).has('laptop'));
+});
+
+test('erzeugePackliste setzt person_id und wählt nach Geschlecht aus', () => {
+  const anna = erzeugePackliste(SPIELZEUG, REISE, { person: ANNA, teilnehmer: { person_id: ANNA.id } });
+  const ben = erzeugePackliste(SPIELZEUG, REISE, { person: BEN, teilnehmer: { person_id: BEN.id } });
+
+  assert.equal(anna.person_id, ANNA.id);
+  assert.equal(ben.person_id, BEN.id);
+
+  assert.ok(ids(anna).has('bikini'), 'Bikini ist nicht für Herren');
+  assert.ok(ids(anna).has('binden'));
+  assert.ok(!ids(anna).has('badehose'), 'Badehose ist nicht für Damen');
+
+  assert.ok(ids(ben).has('badehose'));
+  assert.ok(!ids(ben).has('bikini'));
+  assert.ok(!ids(ben).has('binden'));
+});
+
+test('ein Geschlechts-Item bleibt an seine Saison gebunden', () => {
+  // Der Grund, warum das Geschlecht als `nicht_mit` geführt wird und nicht als
+  // positives Tag: so bleibt „nur für ihn" mit „nur im Sommer" kombinierbar.
+  const winter = { ...REISE, saison: 'Winter', aktivitaeten: [] };
+  const ben = erzeugePackliste(SPIELZEUG, winter, { person: BEN, teilnehmer: { person_id: BEN.id } });
+  const anna = erzeugePackliste(SPIELZEUG, winter, { person: ANNA, teilnehmer: { person_id: ANNA.id } });
+
+  assert.ok(!ids(ben).has('badehose'), 'Badehose im Winter, obwohl es ein Herren-Item ist');
+  assert.ok(!ids(anna).has('bikini'), 'Bikini im Winter, obwohl es ein Damen-Item ist');
+  assert.ok(ids(anna).has('binden'), 'Binden hängt an keiner Saison');
+  assert.ok(!ids(ben).has('binden'));
+});
+
+test('ein positives Geschlechts-Tag wirkt ebenso — die Wahl liegt im Katalog', () => {
+  // Beide Schreibweisen funktionieren; für saisonabhängige Items ist `nicht_mit`
+  // die richtige. Dieser Fall friert den positiven Weg mit ein.
+  const spielzeug = {
+    items: [
+      { id: 'nur-fuer-sie', name: 'Nur für sie', kategorie: 'Kleidung', tags: ['Damen'], menge: { art: 'einmal' }, nicht_mit: [] },
+      { id: 'neutral', name: 'Neutral', kategorie: 'Kleidung', tags: ['Allgemein'], menge: { art: 'einmal' }, nicht_mit: [] },
+    ],
+  };
+  const anna = erzeugePackliste(spielzeug, REISE, { person: ANNA, teilnehmer: { person_id: ANNA.id } });
+  const ben = erzeugePackliste(spielzeug, REISE, { person: BEN, teilnehmer: { person_id: BEN.id } });
+
+  assert.deepEqual([...ids(anna)].sort(), ['neutral', 'nur-fuer-sie']);
+  assert.deepEqual([...ids(ben)], ['neutral']);
+});
+
+test('die eigene Aktivität bringt die eigenen Items — und nur bei dieser Person', () => {
+  const anna = erzeugePackliste(SPIELZEUG, REISE, { person: ANNA, teilnehmer: { person_id: ANNA.id, aktivitaeten: ['Fotografie'] } });
+  const ben = erzeugePackliste(SPIELZEUG, REISE, { person: BEN, teilnehmer: { person_id: BEN.id, aktivitaeten: ['Arbeit'] } });
+
+  assert.ok(ids(anna).has('kamera') && !ids(anna).has('laptop'));
+  assert.ok(ids(ben).has('laptop') && !ids(ben).has('kamera'));
+});
+
+test('erzeugePacklisten ergibt eine Liste je Teilnehmer, in deren Reihenfolge', () => {
+  const teilnehmer = [
+    { person_id: ANNA.id, aktivitaeten: ['Fotografie'] },
+    { person_id: BEN.id, aktivitaeten: ['Arbeit'] },
+  ];
+  const listen = erzeugePacklisten(SPIELZEUG, REISE, [ANNA, BEN], teilnehmer);
+
+  assert.equal(listen.length, 2);
+  assert.deepEqual(listen.map((l) => l.person_id), [ANNA.id, BEN.id]);
+  assert.equal(listen[0].reise_id, REISE.id);
+  assert.ok(ids(listen[0]).has('kamera'));
+  assert.ok(ids(listen[1]).has('laptop'));
+});
+
+test('erzeugePacklisten überspringt Teilnehmer ohne Person in der Registry', () => {
+  const teilnehmer = [
+    { person_id: ANNA.id },
+    { person_id: 'p-geloescht' },
+  ];
+  const listen = erzeugePacklisten(SPIELZEUG, REISE, [ANNA], teilnehmer);
+  assert.deepEqual(listen.map((l) => l.person_id), [ANNA.id], 'eine gelöschte Person hinterlässt keine leere Liste');
+});
+
+test('erzeugePacklisten ohne Teilnehmer ist keine Liste', () => {
+  assert.deepEqual(erzeugePacklisten(SPIELZEUG, REISE, [ANNA, BEN], []), []);
+  assert.deepEqual(erzeugePacklisten(SPIELZEUG, REISE, [], null), []);
+});
+
+test('alsMarkdown unterscheidet zwei Listen derselben Reise am Namen', () => {
+  const pos = [{ item_id: 'bikini', menge: 1, gepackt: false }];
+  const ohne = alsMarkdown(SPIELZEUG, REISE, pos);
+  const mit = alsMarkdown(SPIELZEUG, REISE, pos, false, ANNA);
+
+  assert.match(ohne, /^# Packliste — Tauchurlaub$/m);
+  assert.match(mit, /^# Packliste — Tauchurlaub — Anna$/m);
+  assert.match(mit, /Anna · Sommer/, 'der Personenname steht in der Kopfzeile');
 });
 
 /* --- Das Beispiel aus PRD §5.2 --------------------------------------------- */

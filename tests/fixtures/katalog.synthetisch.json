@@ -2,12 +2,39 @@
   "version": 1,
   "items": [
     {
+      "id": "badehose",
+      "name": "Badehose",
+      "kategorie": "Kleidung",
+      "tags": ["Sommer", "Strand"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": ["Damen"],
+      "im_besitz": true
+    },
+    {
       "id": "badeschuhe",
       "name": "Badeschuhe",
       "kategorie": "Schuhe",
       "tags": ["Allgemein"],
       "menge": { "art": "einmal" },
       "nicht_mit": ["Wandern"],
+      "im_besitz": true
+    },
+    {
+      "id": "bikini",
+      "name": "Bikini",
+      "kategorie": "Kleidung",
+      "tags": ["Sommer", "Tauchen", "Strand"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": ["Herren"],
+      "im_besitz": true
+    },
+    {
+      "id": "binden",
+      "name": "Binden",
+      "kategorie": "Kosmetik & Pflege",
+      "tags": ["Allgemein"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": ["Herren"],
       "im_besitz": true
     },
     {
@@ -38,6 +65,15 @@
       "im_besitz": true
     },
     {
+      "id": "kamera",
+      "name": "Kamera",
+      "kategorie": "Technik",
+      "tags": ["Fotografie"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
       "id": "kissen",
       "name": "Kissen",
       "kategorie": "Campingausrüstung",
@@ -51,6 +87,15 @@
       "name": "Kulturbeutel",
       "kategorie": "Taschen & Ordnung",
       "tags": ["Allgemein"],
+      "menge": { "art": "einmal" },
+      "nicht_mit": [],
+      "im_besitz": true
+    },
+    {
+      "id": "laptop",
+      "name": "Laptop",
+      "kategorie": "Technik",
+      "tags": ["Arbeit"],
       "menge": { "art": "einmal" },
       "nicht_mit": [],
       "im_besitz": true

@@ -75,6 +75,22 @@ export const UNTERKUNFT = ['Camping', 'Ferienwohnung', 'Hotel', 'Hostel', 'Freun
  */
 export const AKTIVITAETEN = TAG_GRUPPEN.find((g) => g.gruppe === 'Aktivität').tags;
 
+/**
+ * Personen-Tags — ein **eigenes Vokabular**, bewusst nicht in `TAG_GRUPPEN`.
+ *
+ * Das Geschlecht einer Person wirkt als gewöhnlicher Katalog-Tag: `Binden` trägt
+ * `Damen`, `Badehose` `Herren`. Weil diese Liste nicht in `TAG_GRUPPEN` steht,
+ * taucht sie in keinem Chip und keiner Vorschlagsliste des Reise-Formulars auf —
+ * ein Geschlecht gehört zu einer Person, nicht zu einer Reise.
+ *
+ * Wichtig bei der Katalogpflege: ein `Damen`/`Herren`-Item darf `Allgemein`
+ * **nicht** tragen, sonst kommt es über das Fundament für alle mit.
+ */
+export const PERSON_TAGS = ['Damen', 'Herren'];
+
+/** Zuordnung Geschlecht -> Tag. Leer heißt: kein Tag, die Person wirkt neutral. */
+export const GESCHLECHT_TAGS = { weiblich: 'Damen', maennlich: 'Herren' };
+
 /* --- Reisedauer ------------------------------------------------------------ */
 
 /**
@@ -200,6 +216,35 @@ export function abgeleiteteTags(reise) {
   return tags;
 }
 
+/* --- Personen (PRD §4.6) --------------------------------------------------- */
+
+/** Die Tags, die eine Person von sich aus mitbringt — heute nur ihr Geschlecht. */
+export function personTags(person) {
+  const tag = GESCHLECHT_TAGS[person?.geschlecht];
+  return new Set(tag ? [tag] : []);
+}
+
+/**
+ * Wie `tripTags`, aber für genau **eine** Person:
+ *
+ *   tripTags(reise) ∪ teilnehmer.aktivitaeten ∪ personTags(person)
+ *
+ * Personen-Aktivitäten kommen **nach** `entfernte_tags` dazu und gewinnen damit:
+ * sie sind die ausdrückliche Angabe dieser Person, ein Streichen der Reise gilt
+ * für sie nicht.
+ *
+ * @param {object} reise
+ * @param {{aktivitaeten?: string[]}} teilnehmer — der Eintrag dieser Person an dieser Reise
+ * @param {{geschlecht?: string}} person
+ * @returns {Set<string>}
+ */
+export function tripTagsFuerPerson(reise, teilnehmer, person) {
+  const tags = tripTags(reise);
+  for (const t of teilnehmer?.aktivitaeten ?? []) if (t) tags.add(t);
+  for (const t of personTags(person)) tags.add(t);
+  return tags;
+}
+
 /* --- Auswahl (PRD §5.1) ---------------------------------------------------- */
 
 /**
@@ -217,12 +262,17 @@ export function passtZuReise(item, tags) {
  * Bewusst materialisiert und nicht live berechnet: Overrides (US-05) und
  * Häkchen (US-06) würden sonst bei jedem Render verloren gehen.
  *
+ * Ohne `person` ist das die eine Liste einer Ein-Personen-Reise (Altverhalten).
+ * Mit `person` kommen deren Geschlechts-Tag und ihre eigenen Aktivitäten dazu —
+ * eine Reise mit zwei Personen ergibt so zwei Listen (PRD §4.6).
+ *
  * @param {{items: Array}} katalog
  * @param {object} reise
- * @returns {{reise_id: string, erzeugt_am: string, positionen: Array}}
+ * @param {{person?: object, teilnehmer?: object}} [optionen]
+ * @returns {{reise_id: string, person_id: string|null, erzeugt_am: string, positionen: Array}}
  */
-export function erzeugePackliste(katalog, reise) {
-  const tags = tripTags(reise);
+export function erzeugePackliste(katalog, reise, { person = null, teilnehmer = null } = {}) {
+  const tags = person ? tripTagsFuerPerson(reise, teilnehmer, person) : tripTags(reise);
   const tage = reisetage(reise?.von, reise?.bis);
 
   const positionen = (katalog?.items ?? [])
@@ -236,9 +286,26 @@ export function erzeugePackliste(katalog, reise) {
 
   return {
     reise_id: reise.id,
+    person_id: person?.id ?? null,
     erzeugt_am: new Date().toISOString(),
     positionen,
   };
+}
+
+/**
+ * Eine Reise, mehrere Personen: je Teilnehmer eine Liste.
+ *
+ * Teilnehmer ohne Eintrag in der Personen-Registry werden übersprungen — eine
+ * gelöschte Person soll keine leere Liste hinterlassen.
+ *
+ * @param {Array} personen — die Registry aus `daten.personen`
+ * @param {Array<{person_id: string, aktivitaeten?: string[]}>} teilnehmerListe
+ */
+export function erzeugePacklisten(katalog, reise, personen, teilnehmerListe) {
+  return (teilnehmerListe ?? [])
+    .map((t) => ({ t, person: (personen ?? []).find((p) => p.id === t.person_id) ?? null }))
+    .filter(({ person }) => person)
+    .map(({ person, t }) => erzeugePackliste(katalog, reise, { person, teilnehmer: t }));
 }
 
 /**
@@ -303,15 +370,22 @@ export function fortschritt(positionen) {
 
 /**
  * Markdown-Checkliste. Gruppierung und Mengen bleiben erhalten (US-07).
+ *
+ * Mit `person` wandert der Personenname in Titel und Kopfzeile — sonst sähen
+ * zwei Listen derselben Reise als Datei gleich aus.
+ *
  * @param {boolean} nurUngepackte — nur offene Positionen ausgeben
+ * @param {{name?: string}|null} person
  */
-export function alsMarkdown(katalog, reise, positionen, nurUngepackte = false) {
+export function alsMarkdown(katalog, reise, positionen, nurUngepackte = false, person = null) {
   const tage = reisetage(reise?.von, reise?.bis);
-  const zeilen = [`# Packliste — ${reise?.name || 'Reise'}`, ''];
+  const titel = `${reise?.name || 'Reise'}${person?.name ? ` — ${person.name}` : ''}`;
+  const zeilen = [`# Packliste — ${titel}`, ''];
 
   const kopf = [
     tage > 0 ? `${tage} Tage` : null,
     reise?.ziel || null,
+    person?.name || null,
     reise?.saison || null,
     (reise?.aktivitaeten ?? []).join(', ') || null,
     reise?.verkehrsmittel || null,
