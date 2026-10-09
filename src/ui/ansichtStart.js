@@ -22,7 +22,12 @@ export function ansichtStart(zustand) {
 
 /* --- FR19 ------------------------------------------------------------------ */
 
-function importAufforderung({ aktionen, laden }) {
+function importAufforderung({ aktionen, daten, laden }) {
+  // Der Katalog ist weg, die Reisen sind es nicht (eigener Speichertopf, PRD
+  // §4.5). Ohne diesen Satz liest die Aufforderung wie Datenverlust — die
+  // Übersicht ist ja ebenfalls verschwunden.
+  const anzahl = daten?.reisen?.length ?? 0;
+
   return h(
     'div',
     { class: 'stapel' },
@@ -35,6 +40,15 @@ function importAufforderung({ aktionen, laden }) {
         h('code', {}, 'katalog.json'),
         ' — die im privaten Daten-Repo liegt und hier einmal geholt wird. Danach bleibt sie gespeichert.'
       ),
+      anzahl > 0
+        ? h(
+            'p',
+            { class: 'klein' },
+            anzahl === 1
+              ? 'Deine Reise ist noch da. Sie braucht nur den Katalog, um angezeigt zu werden.'
+              : `Deine ${anzahl} Reisen sind noch da. Sie brauchen nur den Katalog, um angezeigt zu werden.`
+          )
+        : null,
       h(
         'ol',
         { class: 'schritte' },

@@ -336,6 +336,15 @@
 
         pruefe('FR19: ohne Katalog kommt die Import-Aufforderung', text().includes('Kein Katalog auf diesem Gerät'));
         pruefe('FR19: kein leerer Listenbildschirm', !text().includes('Meine Reisen'));
+
+        /* Die Reisen aus Durchgang 1 liegen noch da — sie hängen nicht am
+           Katalog. Ohne diesen Hinweis liest die Aufforderung wie Datenverlust. */
+        const nochDa = JSON.parse(localStorage.getItem('packliste.reisen')).reisen.length;
+        pruefe(
+          'FR19: die vorhandenen Reisen werden zugesichert',
+          text().includes(`Deine ${nochDa} Reisen sind noch da.`) || text().includes('Deine Reise ist noch da.'),
+          `${nochDa} ${nochDa === 1 ? 'Reise' : 'Reisen'} gespeichert`
+        );
         pruefe('Import-Knopf ist da', Boolean(knopfMit(app, 'Katalog auswählen')));
 
         /* Katalogansicht muss auch ohne Katalog funktionieren — sie ist der
