@@ -153,8 +153,8 @@ export function ansichtKatalog(zustand) {
           },
           'Reisen exportieren'
         ),
-        dateiWaehler('.json,application/json', (d) => importiereReisen(d, aktionen, false), 'Reisen ergänzen …'),
-        dateiWaehler('.json,application/json', (d) => importiereReisen(d, aktionen, true), 'Bestand ersetzen …')
+        dateiWaehler('.json,application/json', (d) => importiereReisen(d, aktionen, daten, false), 'Reisen ergänzen …'),
+        dateiWaehler('.json,application/json', (d) => importiereReisen(d, aktionen, daten, true), 'Bestand ersetzen …')
       ),
       h('p', { class: 'feld-hinweis' }, 'Exportieren legt eine Datei ab und ändert hier nichts. „Ergänzen" liest eine Datei ein und fügt Neues hinzu. „Ersetzen" wirft den hiesigen Bestand weg und nimmt nur, was in der Datei steht.'),
       datenBackupVorhanden()
