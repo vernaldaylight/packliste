@@ -107,6 +107,15 @@ test('reisetage über die Sommerzeitumstellung bleibt exakt', () => {
   assert.equal(reisetage('2026-03-27', '2026-03-31'), 5);
 });
 
+test('reisetage verwirft unmögliche Kalendertage statt sie überzurollen', () => {
+  // "2024-13-01" wäre der Januar 2025, "2024-02-31" der 2. März — Date.UTC
+  // rollt still über. Beide Tage gibt es nicht, also zählt die Reise als 0.
+  assert.equal(reisetage('2024-13-01', '2024-13-05'), 0);
+  assert.equal(reisetage('2024-02-31', '2024-03-05'), 0);
+  assert.equal(reisetage('2026-13-01', '2026-13-01'), 0, 'und auch ein "Tag" allein bleibt 0');
+  assert.equal(reisetage('2026-02-28', '2026-03-01'), 2, 'gültige Tage bleiben gültig');
+});
+
 test('reisetage ist 0 bei fehlendem oder verkehrtem Zeitraum', () => {
   assert.equal(reisetage('', ''), 0);
   assert.equal(reisetage('2026-08-10', '2026-08-01'), 0);
@@ -225,6 +234,23 @@ test('die Auswahl nimmt Winter- und Regen-Items zusammen (PRD §5.2)', () => {
   };
   const reise = { id: 'x', von: '2026-01-01', bis: '2026-01-02', saison: ['Winter', 'Regen'] };
   assert.deepEqual([...ids(erzeugePackliste(katalog, reise))].sort(), ['schirm', 'wollsocken', 'zahnbuerste']);
+});
+
+test('ein vollständig gepackter Export klingt nicht wie eine leere Liste', () => {
+  const reise = { id: 'md-voll', name: 'Fertig', von: '2026-01-01', bis: '2026-01-02', saison: 'Sommer' };
+  const gepackt = erzeugePackliste(SPIELZEUG, reise).positionen.map((p) => ({ ...p, gepackt: true }));
+  assert.ok(gepackt.length > 0, 'der Spielzeugkatalog liefert hier Positionen');
+
+  const md = alsMarkdown(SPIELZEUG, reise, gepackt, true);
+
+  assert.match(md, /Alles gepackt/);
+  assert.doesNotMatch(md, /Nichts zu packen/);
+});
+
+test('eine leere Liste behält ihren eigenen Text', () => {
+  const reise = { id: 'md-leer', name: 'Leer', von: '2026-01-01', bis: '2026-01-02' };
+  const md = alsMarkdown(SPIELZEUG, reise, [], true);
+  assert.match(md, /Nichts zu packen/);
 });
 
 test('die Markdown-Kopfzeile nennt beide Saison-Tags', () => {

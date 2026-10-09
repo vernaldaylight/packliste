@@ -133,7 +133,14 @@ function tagAlsZahl(iso) {
   if (!m) return null;
   const [, j, mo, t] = m;
   const ms = Date.UTC(Number(j), Number(mo) - 1, Number(t));
-  return Number.isNaN(ms) ? null : ms;
+  if (Number.isNaN(ms)) return null;
+  // Date.UTC rollt ungültige Tage still über ("2024-02-31" wird der 2. März),
+  // die Regex sieht nur die Ziffernform. Deshalb zurückrechnen und vergleichen.
+  const d = new Date(ms);
+  if (d.getUTCFullYear() !== Number(j) || d.getUTCMonth() !== Number(mo) - 1 || d.getUTCDate() !== Number(t)) {
+    return null;
+  }
+  return ms;
 }
 
 /* --- Mengenregel (PRD §4.2) ------------------------------------------------ */
@@ -445,6 +452,12 @@ export function alsMarkdown(katalog, reise, positionen, nurUngepackte = false, p
     zeilen.push('');
   }
 
-  if (leer) zeilen.push('_Nichts zu packen — keine Position auf der Liste._', '');
+  if (leer) {
+    // Zwei verschiedene Fälle: gar keine Position — oder alles schon gepackt.
+    // Der zweite darf nicht wie der erste klingen, sonst liest der Export
+    // nach getaner Arbeit wie eine leere Liste.
+    const nichtsDa = gruppen.every((g) => g.positionen.length === 0);
+    zeilen.push(nichtsDa ? '_Nichts zu packen — keine Position auf der Liste._' : '_Alles gepackt — keine offene Position._', '');
+  }
   return zeilen.join('\n');
 }
