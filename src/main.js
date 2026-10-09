@@ -61,8 +61,19 @@ function packlisteNach(reiseId, personId = null) {
   return findePackliste(zustand.daten.packlisten, reiseId, personId);
 }
 
+/**
+ * Persistiert den Bestand und hält die Warnung im Zustand aktuell. Ein
+ * gescheiterter Schreibvorgang darf die App nicht abbrechen — die Änderung
+ * steht dann nur im Speicher und ist beim nächsten Laden weg, und genau das
+ * sagt die Warnung.
+ */
 function speichere() {
-  speichereDaten(zustand.daten);
+  if (speichereDaten(zustand.daten)) {
+    zustand.speicherWarnung = null;
+  } else {
+    zustand.speicherWarnung =
+      'Der Speicher des Browsers ist voll oder gesperrt — die letzte Änderung ist nicht gesichert. Bitte die Reisen als Datei exportieren.';
+  }
 }
 
 /* --- Aktionen, die die Ansichten aufrufen ---------------------------------- */

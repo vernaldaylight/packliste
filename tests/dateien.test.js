@@ -29,6 +29,7 @@ globalThis.localStorage = {
 globalThis.DOMException ??= class extends Error {};
 
 const { importiereReisen } = await import('../src/ui/dateien.js');
+const { leseJsonDatei } = await import('../src/store.js');
 
 /** Eine Datei, wie sie der Datei-Wähler liefert. */
 function dateiMit(inhalt, name = 'packliste-reisen.json') {
@@ -70,6 +71,28 @@ test('ergänzen: die hiesige Reise bleibt, die fremde kommt dazu', async () => {
   assert.deepEqual(ids, ['r1', 'r2'], 'keine der beiden Reisen darf verloren gehen');
   assert.equal(aktionen.uebernommen.packlisten.length, 1, 'die hiesige Packliste bleibt erhalten');
   assert.match(aktionen.meldungen.at(-1)[0], /1 neu/, 'genau eine Reise ist neu');
+});
+
+test('eine Datei, die nicht mehr lesbar ist, wird gemeldet statt zu werfen', async () => {
+  const kaputt = {
+    name: 'weg.json',
+    text: async () => {
+      throw new Error('Datei ist verschwunden');
+    },
+  };
+
+  const gelesen = await leseJsonDatei(kaputt);
+
+  assert.equal(gelesen.ok, false);
+  assert.match(gelesen.fehler[0], /weg\.json/);
+  assert.match(gelesen.fehler[0], /nicht gelesen/);
+});
+
+test('eine kaputte JSON-Datei wird weiterhin als solche gemeldet', async () => {
+  const gelesen = await leseJsonDatei({ name: 'kaputt.json', text: async () => '{ kein json' });
+
+  assert.equal(gelesen.ok, false);
+  assert.match(gelesen.fehler[0], /keine gültige JSON-Datei/);
 });
 
 test('ergänzen einer bereits bekannten Reise zählt sie nicht als neu', async () => {

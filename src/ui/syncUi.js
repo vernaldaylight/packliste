@@ -68,7 +68,9 @@ export async function zieheKatalog(aktionen) {
     const r = await holeKatalog({ sync: netz(), ...konf });
     if (!r.ok) return meldeFehler(aktionen, r, 'Katalog holen');
 
-    speichereKatalog(r.katalog);
+    if (!speichereKatalog(r.katalog)) {
+      return aktionen.melde('Der Katalog konnte nicht gespeichert werden — der Speicher des Browsers ist voll oder gesperrt.', 'fehler');
+    }
     aktionen.setzeKatalog(r.katalog);
     speichereSyncStand('katalog', { sha: r.sha, geholt_am: new Date().toISOString() });
     aktionen.melde(`Katalog geholt: ${r.statistik.items} Items, ${r.statistik.kategorien} Kategorien.`, 'ok');

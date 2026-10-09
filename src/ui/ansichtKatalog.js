@@ -167,11 +167,17 @@ export function ansichtKatalog(zustand) {
               {
                 class: 'knopf knopf-leise',
                 onclick: () => {
-                  const roh = localStorage.getItem('packliste.reisen.backup');
-                  if (!roh) return;
                   if (!confirm('Letzte Fassung wiederherstellen? Der jetzige Stand wird davor gesichert.')) return;
-                  localStorage.setItem('packliste.reisen', roh);
-                  aktionen.setzeDaten(JSON.parse(roh));
+                  try {
+                    const roh = localStorage.getItem('packliste.reisen.backup');
+                    if (!roh) return;
+                    // `setzeDaten` schreibt selbst — inklusive Backup des
+                    // jetzigen Standes, wie es der Text oben verspricht.
+                    aktionen.setzeDaten(JSON.parse(roh));
+                  } catch {
+                    aktionen.melde('Die Kopie ließ sich nicht wiederherstellen.', 'fehler');
+                    return aktionen.render();
+                  }
                   aktionen.melde('Letzte Fassung wiederhergestellt.', 'ok');
                   aktionen.render();
                 },

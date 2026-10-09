@@ -289,9 +289,7 @@ export function ladeDaten() {
 export function speichereDaten(daten) {
   const alt = lies(SCHLUESSEL.daten);
   if (alt) schreib(SCHLUESSEL.backupDaten, alt);
-  const ok = schreib(SCHLUESSEL.daten, JSON.stringify({ ...daten, version: DATEN_VERSION }));
-  if (!ok) throw new Error('Der Speicher des Browsers ist voll oder gesperrt. Bitte die Reisen als Datei exportieren.');
-  return true;
+  return schreib(SCHLUESSEL.daten, JSON.stringify({ ...daten, version: DATEN_VERSION }));
 }
 
 export function datenBackupVorhanden() {
@@ -400,11 +398,20 @@ export function fuegeReisenZusammen(bestand, neu) {
 
 /** Liest eine vom Nutzer ausgewählte Datei als JSON. */
 export async function leseJsonDatei(datei) {
-  const text = await datei.text();
+  const name = datei?.name ?? 'Die Datei';
+  let text;
+  try {
+    // Auch das Lesen kann scheitern — eine Datei, die inzwischen weg ist,
+    // liefert keine TextPromise, sondern einen Fehler. Beide Fälle melden
+    // dasselbe: nichts wurde übernommen.
+    text = await datei.text();
+  } catch {
+    return { ok: false, fehler: [`"${name}" konnte nicht gelesen werden.`] };
+  }
   try {
     return { ok: true, daten: JSON.parse(text) };
   } catch {
-    return { ok: false, fehler: [`"${datei.name}" ist keine gültige JSON-Datei.`] };
+    return { ok: false, fehler: [`"${name}" ist keine gültige JSON-Datei.`] };
   }
 }
 
