@@ -31,7 +31,10 @@ import {
   gruppiere,
   fortschritt,
   alsMarkdown,
+  abgeleiteteTags,
+  saisonListe,
   KATEGORIEN,
+  SAISONS,
   BEKANNTE_TAGS,
   PERSON_TAGS,
   GESCHLECHT_TAGS,
@@ -165,9 +168,67 @@ test('Allgemein ist auch ohne jede Angabe dabei', () => {
 });
 
 test('zusatz_tags kommen dazu, entfernte_tags fallen weg', () => {
-  const tags = tripTags({ saison: 'Sommer', zusatz_tags: ['Regen'], entfernte_tags: ['Sommer'] });
-  assert.ok(tags.has('Regen'));
+  const tags = tripTags({ saison: 'Sommer', zusatz_tags: ['Tropen'], entfernte_tags: ['Sommer'] });
+  assert.ok(tags.has('Tropen'));
   assert.ok(!tags.has('Sommer'));
+});
+
+/* --- Saison ist eine Mehrfachauswahl (1.10) -------------------------------- */
+
+test('saisonListe: Altwert und Liste ergeben beide eine Liste', () => {
+  assert.deepEqual(saisonListe('Sommer'), ['Sommer'], 'der Altwert aus dem Bestand');
+  assert.deepEqual(saisonListe(['Winter', 'Regen']), ['Winter', 'Regen']);
+  assert.deepEqual(saisonListe(undefined), []);
+  assert.deepEqual(saisonListe(''), [], 'ein leerer String ist kein Tag');
+  assert.deepEqual(saisonListe(['']), [], 'und ein leerer Eintrag auch nicht');
+  assert.deepEqual(saisonListe(null), []);
+});
+
+test('Regen ist ein Saison-Tag wie Winter und Sommer (Anhang B.2)', () => {
+  assert.ok(SAISONS.includes('Regen'), 'Regen steht in der Gruppe "Klima / Saison"');
+  assert.deepEqual(SAISONS, ['Winter', 'Sommer', 'Übergangszeit', 'Regen']);
+});
+
+test('Winter und Regen gleichzeitig — der Kern der Mehrfachauswahl', () => {
+  const tags = tripTags({ saison: ['Winter', 'Regen'] });
+  assert.ok(tags.has('Winter'));
+  assert.ok(tags.has('Regen'), 'Regen tritt neben die Jahreszeit, es ersetzt sie nicht');
+});
+
+test('der Altwert-String wirkt weiter wie eine Saison (Toleranz)', () => {
+  assert.ok(tripTags({ saison: 'Sommer' }).has('Sommer'));
+  assert.deepEqual([...tripTags({ saison: [] })], ['Allgemein'], 'ohne Saison bleibt Allgemein');
+});
+
+test('eine gestrichene Saison fällt auch aus der Liste', () => {
+  const tags = tripTags({ saison: ['Winter', 'Regen'], entfernte_tags: ['Regen'] });
+  assert.ok(tags.has('Winter'), 'der andere Wert bleibt');
+  assert.ok(!tags.has('Regen'));
+});
+
+test('abgeleiteteTags zählt alle Saison-Werte einzeln auf', () => {
+  const tags = abgeleiteteTags({ saison: ['Winter', 'Regen'] });
+  assert.ok(tags.has('Winter'));
+  assert.ok(tags.has('Regen'));
+});
+
+test('die Auswahl nimmt Winter- und Regen-Items zusammen (PRD §5.2)', () => {
+  const einmal = { art: 'einmal' };
+  const katalog = {
+    items: [
+      { id: 'wollsocken', kategorie: 'Kleidung', tags: ['Winter'], menge: einmal },
+      { id: 'schirm', kategorie: 'Haushalt & Sonstiges', tags: ['Regen'], menge: einmal },
+      { id: 'zahnbuerste', kategorie: 'Kosmetik & Pflege', tags: ['Allgemein'], menge: einmal },
+    ],
+  };
+  const reise = { id: 'x', von: '2026-01-01', bis: '2026-01-02', saison: ['Winter', 'Regen'] };
+  assert.deepEqual([...ids(erzeugePackliste(katalog, reise))].sort(), ['schirm', 'wollsocken', 'zahnbuerste']);
+});
+
+test('die Markdown-Kopfzeile nennt beide Saison-Tags', () => {
+  const reise = { id: 'm', name: 'Regenwinter', von: '2026-01-01', bis: '2026-01-02', saison: ['Winter', 'Regen'] };
+  const md = alsMarkdown({ items: [] }, reise, []);
+  assert.match(md, /Winter, Regen/);
 });
 
 test('Allgemein lässt sich nicht abwählen', () => {

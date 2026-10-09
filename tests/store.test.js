@@ -354,6 +354,29 @@ test('ein Stand ohne personen bleibt gültig und wird aufgefüllt', () => {
   assert.equal(d.packlisten[0].person_id, undefined, 'einer alten Liste wird kein person_id angedichtet');
 });
 
+test('ein Saison-String aus dem Altbestand wird zu einer Liste (1.10)', () => {
+  // Genau der Fall, den ein zweites Gerät mit alter App-Version erzeugt: dort
+  // steht `saison` noch als Einzelwert. Die Umstellung passiert beim Laden,
+  // damit die Engine nur eine Form kennen muss.
+  localStorage.setItem(
+    SCHLUESSEL.daten,
+    JSON.stringify({
+      version: 1,
+      reisen: [
+        { id: 'r1', name: 'Tauchurlaub', saison: 'Sommer' },
+        { id: 'r2', name: 'Regenwinter', saison: ['Winter', 'Regen'] },
+        { id: 'r3', name: 'Ohne Saison' },
+      ],
+      packlisten: [],
+    })
+  );
+
+  const d = ladeDaten();
+  assert.deepEqual(d.reisen[0].saison, ['Sommer'], 'der Einzelwert wird zur Ein-Element-Liste');
+  assert.deepEqual(d.reisen[1].saison, ['Winter', 'Regen'], 'eine Liste bleibt eine Liste');
+  assert.deepEqual(d.reisen[2].saison, [], 'ohne Angabe ist die Auswahl leer');
+});
+
 test('findePackliste unterscheidet die Personen derselben Reise', () => {
   const listeAnna = { reise_id: 'r1', person_id: 'p1', positionen: [] };
   const listeBen = { reise_id: 'r1', person_id: 'p2', positionen: [] };

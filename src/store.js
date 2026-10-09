@@ -13,7 +13,7 @@
  * Vor jedem Schreiben wird die Vorgängerversion als Backup gesichert (PRD §9).
  */
 
-import { KATEGORIEN } from './engine.js';
+import { KATEGORIEN, saisonListe } from './engine.js';
 
 export const SCHLUESSEL = {
   katalog: 'packliste.katalog',
@@ -228,6 +228,10 @@ export function katalogBackupVorhanden() {
  * `personen` und keine `teilnehmer`. Sie bleiben gültig. Einer alten Packliste
  * wird **kein** `person_id` angedichtet — das änderte ihre Identität; Leser
  * nehmen `p.person_id ?? null`.
+ *
+ * `saison` wandert hier von einem einzelnen String auf eine Liste (1.10). Weil
+ * Laden, Datei-Import und Sync-Merge alle durch diese Funktion laufen, ist das
+ * die einzige Stelle, an der die alte Form ankommen kann.
  */
 export function normalisiereDaten(roh) {
   return {
@@ -236,6 +240,9 @@ export function normalisiereDaten(roh) {
     reisen: (Array.isArray(roh?.reisen) ? roh.reisen : []).map((r) => ({
       ...r,
       teilnehmer: Array.isArray(r?.teilnehmer) ? r.teilnehmer : [],
+      // 1.10: `saison` ist eine Mehrfachauswahl (PRD §4.3). Im Altbestand steht
+      // dort ein einzelner String oder nichts — `saisonListe` macht daraus eine.
+      saison: saisonListe(r?.saison),
     })),
     packlisten: Array.isArray(roh?.packlisten) ? roh.packlisten : [],
   };

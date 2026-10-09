@@ -6,7 +6,7 @@
  * testbar (PRD §12, Woche 1).
  *
  * Auswahllogik (PRD §5.1):
- *   tripTags = {saison} ∪ aktivitaeten ∪ {verkehrsmittel} ∪ {unterkunft}
+ *   tripTags = {saison-Tags} ∪ aktivitaeten ∪ {verkehrsmittel} ∪ {unterkunft}
  *              ∪ zusatz_tags ∪ {"Allgemein"}   \ entfernte_tags
  *   `Allgemein` ist das Fundament und lässt sich nicht streichen — entfernte_tags
  *   kann es nicht abwählen.
@@ -50,7 +50,7 @@ export const TAG_GRUPPEN = [
   { gruppe: 'Unterkunft', tags: ['Camping', 'Ferienwohnung', 'Hotel', 'Hostel', 'Freunde'] },
 ];
 
-/** Alle bekannten Tags, flach — für Vorschlagslisten und Freitext-Prüfung. */
+/** Alle bekannten Tags, flach — das Vokabular der Reisekontexte, als Ganzes. */
 export const BEKANNTE_TAGS = TAG_GRUPPEN.flatMap((g) => g.tags);
 
 /** Das Fundament jeder Reise (PRD §5.1): ohne diesen Tag gäbe es keine Zahnbürste. */
@@ -65,7 +65,14 @@ export const BASIS_TAGS = TAG_GRUPPEN.find((g) => g.gruppe === 'Basis').tags;
  */
 export const WAHLBARE_BASIS_TAGS = BASIS_TAGS.filter((t) => t !== BASIS_TAG);
 
-export const SAISONS = ['Winter', 'Sommer', 'Übergangszeit'];
+/**
+ * Die Saison-/Klima-Tags — abgeleitet aus der Gruppe statt neu getippt, wie
+ * `AKTIVITAETEN` und `BASIS_TAGS` oben. Sonst liefe das Formular wieder aus der
+ * Gruppe heraus, und genau das hatte `Regen` unerreichbar gemacht: es stand in
+ * `TAG_GRUPPEN`, aber nicht in dieser Liste.
+ */
+export const SAISONS = TAG_GRUPPEN.find((g) => g.gruppe === 'Klima / Saison').tags;
+
 export const VERKEHRSMITTEL = ['Flugzeug', 'Auto', 'Zug'];
 export const UNTERKUNFT = ['Camping', 'Ferienwohnung', 'Hotel', 'Hostel', 'Freunde'];
 
@@ -177,6 +184,24 @@ export function regelText(regel) {
 /* --- Tag-Ableitung (PRD §4.3) ---------------------------------------------- */
 
 /**
+ * Ein Saison-Wert als Liste.
+ *
+ * `saison` ist seit 1.10 eine Mehrfachauswahl (`['Winter', 'Regen']`), in
+ * Altbeständen steht dort aber noch ein einzelner String. Beide Formen kommen
+ * hier an **einer** Stelle zusammen — `tripTags`, `abgeleiteteTags`, der
+ * Markdown-Export und die Migration in `store.js` achten so nicht jede für sich
+ * auf die Form. Leerwerte fallen weg, damit `['']` kein Tag ergibt.
+ *
+ * @param {string|string[]|null|undefined} wert
+ * @returns {string[]}
+ */
+export function saisonListe(wert) {
+  if (Array.isArray(wert)) return wert.filter((t) => typeof t === 'string' && t);
+  if (typeof wert === 'string' && wert) return [wert];
+  return [];
+}
+
+/**
  * Die abgeleiteten Reise-Tags.
  *
  * `entfernte_tags` ist die Gegenbuchse zu `zusatz_tags`: das Formular zeigt die
@@ -189,7 +214,7 @@ export function regelText(regel) {
 export function tripTags(reise) {
   const tags = new Set([BASIS_TAG]);
 
-  if (reise?.saison) tags.add(reise.saison);
+  for (const t of saisonListe(reise?.saison)) tags.add(t);
   for (const t of reise?.aktivitaeten ?? []) if (t) tags.add(t);
   if (reise?.verkehrsmittel) tags.add(reise.verkehrsmittel);
   if (reise?.unterkunft) tags.add(reise.unterkunft);
@@ -203,12 +228,12 @@ export function tripTags(reise) {
 
 /**
  * Die Tags, die das Formular als "abgeleitet" anzeigt: alles aus den festen
- * Feldern, ohne die frei eingetippten Zusatz-Tags. Nur diese lassen sich
- * streichen — die Zusatz-Tags entfernt man, indem man sie löscht.
+ * Feldern, ohne die Zusatz-Tags. Nur diese lassen sich streichen — die
+ * Zusatz-Tags entfernt man, indem man sie löscht.
  */
 export function abgeleiteteTags(reise) {
   const tags = new Set();
-  if (reise?.saison) tags.add(reise.saison);
+  for (const t of saisonListe(reise?.saison)) tags.add(t);
   for (const t of reise?.aktivitaeten ?? []) if (t) tags.add(t);
   if (reise?.verkehrsmittel) tags.add(reise.verkehrsmittel);
   if (reise?.unterkunft) tags.add(reise.unterkunft);
@@ -386,7 +411,7 @@ export function alsMarkdown(katalog, reise, positionen, nurUngepackte = false, p
     tage > 0 ? `${tage} Tage` : null,
     reise?.ziel || null,
     person?.name || null,
-    reise?.saison || null,
+    saisonListe(reise?.saison).join(', ') || null,
     (reise?.aktivitaeten ?? []).join(', ') || null,
     reise?.verkehrsmittel || null,
     reise?.unterkunft || null,
