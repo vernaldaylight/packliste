@@ -125,7 +125,7 @@ function reiseZeile(reise, daten, aktionen) {
   const stand = (liste) => {
     if (!liste) return null;
     const s = fortschritt(liste.positionen);
-    return `${s.gepackt} von ${s.gesamt} gepackt${s.gesamt > 0 ? ` · ${Math.round(s.anteil * 100)} %` : ''}`;
+    return fmtFortschritt(s);
   };
 
   return h(

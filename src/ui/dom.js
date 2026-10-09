@@ -121,3 +121,16 @@ export function fmtZeitraum(von, bis, tage) {
   const zeitraum = a && b ? `${a} – ${b}` : a || b || 'kein Zeitraum';
   return tage > 0 ? `${zeitraum} · ${tage} ${tage === 1 ? 'Tag' : 'Tage'}` : zeitraum;
 }
+
+/**
+ * „4 von 12 gepackt · 33 %" aus `fortschritt()` (engine.js).
+ *
+ * `leer` ist der Text für den Fall, dass die Liste gar keine Position hat. Die
+ * Übersicht lässt ihn weg und schreibt „0 von 0 gepackt" — dort steht direkt
+ * darüber schon, dass es noch keine Liste gibt. Die Listenansicht setzt ihn.
+ */
+export function fmtFortschritt(s, leer = null) {
+  if (s.gesamt === 0 && leer) return leer;
+  const prozent = s.gesamt > 0 ? ` · ${Math.round(s.anteil * 100)} %` : '';
+  return `${s.gepackt} von ${s.gesamt} gepackt${prozent}`;
+}

@@ -212,11 +212,7 @@ export function saisonListe(wert) {
  */
 export function tripTags(reise) {
   const tags = new Set([BASIS_TAG]);
-
-  for (const t of saisonListe(reise?.saison)) tags.add(t);
-  for (const t of reise?.aktivitaeten ?? []) if (t) tags.add(t);
-  if (reise?.verkehrsmittel) tags.add(reise.verkehrsmittel);
-  if (reise?.unterkunft) tags.add(reise.unterkunft);
+  for (const t of festeTags(reise)) tags.add(t);
   for (const t of reise?.zusatz_tags ?? []) if (t) tags.add(t);
 
   // `Allgemein` ist nicht abwählbar: es bleibt, auch wenn es in entfernte_tags steht.
@@ -226,18 +222,25 @@ export function tripTags(reise) {
 }
 
 /**
+ * Die Tags aus den festen Feldern des Formulars — ohne `zusatz_tags`, ohne
+ * `entfernte_tags` und ohne `Allgemein`. Beidesmal dieselben vier Felder, also
+ * an einer Stelle: hier.
+ */
+function festeTags(reise) {
+  const tags = new Set(saisonListe(reise?.saison));
+  for (const t of reise?.aktivitaeten ?? []) if (t) tags.add(t);
+  if (reise?.verkehrsmittel) tags.add(reise.verkehrsmittel);
+  if (reise?.unterkunft) tags.add(reise.unterkunft);
+  return tags;
+}
+
+/**
  * Die Tags, die das Formular als "abgeleitet" anzeigt: alles aus den festen
  * Feldern, ohne die Zusatz-Tags. Nur diese lassen sich streichen — die
  * Zusatz-Tags entfernt man, indem man sie löscht.
  */
 export function abgeleiteteTags(reise) {
-  const tags = new Set();
-  for (const t of saisonListe(reise?.saison)) tags.add(t);
-  for (const t of reise?.aktivitaeten ?? []) if (t) tags.add(t);
-  if (reise?.verkehrsmittel) tags.add(reise.verkehrsmittel);
-  if (reise?.unterkunft) tags.add(reise.unterkunft);
-  tags.add(BASIS_TAG);
-  return tags;
+  return new Set([BASIS_TAG, ...festeTags(reise)]);
 }
 
 /* --- Personen (PRD §4.6) --------------------------------------------------- */
@@ -357,6 +360,16 @@ export function neuePosition(item, tage) {
  *
  * @returns {Array<{kategorie: string, positionen: Array}>}
  */
+/**
+ * Die Reihenfolge der Kategorien nach `KATEGORIEN`. Unbekannte landen hinten —
+ * so bleibt ein neu importierter Katalog sortierbar, auch wenn er eine
+ * Kategorie mitbringt, die diese Version noch nicht kennt.
+ */
+export function rang(kategorie) {
+  const i = KATEGORIEN.indexOf(kategorie);
+  return i === -1 ? KATEGORIEN.length : i;
+}
+
 export function gruppiere(katalog, positionen) {
   const nachId = new Map((katalog?.items ?? []).map((i) => [i.id, i]));
   const eimer = new Map();
@@ -368,11 +381,6 @@ export function gruppiere(katalog, positionen) {
     if (!eimer.has(kategorie)) eimer.set(kategorie, []);
     eimer.get(kategorie).push({ ...pos, item });
   }
-
-  const rang = (k) => {
-    const i = KATEGORIEN.indexOf(k);
-    return i === -1 ? KATEGORIEN.length : i;
-  };
 
   return [...eimer.entries()]
     .sort((a, b) => rang(a[0]) - rang(b[0]) || a[0].localeCompare(b[0], 'de'))

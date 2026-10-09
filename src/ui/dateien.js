@@ -33,10 +33,9 @@ export async function importiereKatalog(datei, aktionen) {
   aktionen.setzeKatalog(geprueft.katalog);
 
   const s = geprueft.statistik;
-  const gepflegt = s.regeln.fest + s.regeln.pro_tage;
   aktionen.melde(
     `Katalog übernommen: ${s.items} Items, ${s.kategorien} Kategorien, ${s.tags} Tags. ` +
-      `Mengenregeln: ${s.regeln.einmal}× einmal, ${gepflegt}× gepflegt (fest/pro Tag).`,
+      `Mengenregeln: ${s.regeln.einmal}× einmal, ${s.gepflegt}× gepflegt (fest/pro Tag).`,
     'ok'
   );
   aktionen.render();

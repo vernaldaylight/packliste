@@ -13,7 +13,7 @@
  * eigenen Häkchen.
  */
 
-import { h, karte, meldung, fmtZeitraum } from './dom.js';
+import { h, karte, meldung, fmtZeitraum, fmtFortschritt } from './dom.js';
 import {
   gruppiere,
   fortschritt,
@@ -23,7 +23,7 @@ import {
   erzeugePackliste,
   neuePosition,
 } from '../engine.js';
-import { inZwischenablage, zeitstempel, findePackliste } from '../store.js';
+import { inZwischenablage, teileDatei, zeitstempel, findePackliste } from '../store.js';
 
 export function ansichtListe({ katalog, daten, aktionen, reiseId, personId = null }) {
   const reise = daten.reisen.find((r) => r.id === reiseId) ?? null;
@@ -150,7 +150,7 @@ export function ansichtListe({ katalog, daten, aktionen, reiseId, personId = nul
         h(
           'p',
           { class: 'klein' },
-          s.gesamt === 0 ? 'Keine Position auf der Liste.' : `${s.gepackt} von ${s.gesamt} gepackt · ${Math.round(s.anteil * 100)} %`
+          fmtFortschritt(s, 'Keine Position auf der Liste.')
         )
       )
     );
@@ -381,7 +381,7 @@ export function ansichtListe({ katalog, daten, aktionen, reiseId, personId = nul
     // würden sich sonst beim Ablegen überschreiben.
     const wem = aktiv ? `-${dateinameTeil(aktiv.person.name)}` : '';
     const dateiname = `packliste-${sauber}${wem}-${zeitstempel()}.md`;
-    const ergebnis = await teileText(md, dateiname, `${reise.name}${aktiv ? ` — ${aktiv.person.name}` : ''}`, 'text/markdown');
+    const ergebnis = await teileDatei(md, dateiname, `${reise.name}${aktiv ? ` — ${aktiv.person.name}` : ''}`, 'text/markdown');
     if (ergebnis === 'geteilt' || ergebnis === 'heruntergeladen') {
       aktionen.melde(ergebnis === 'geteilt' ? 'Markdown geteilt.' : 'Markdown als Datei gespeichert.', 'ok');
       aktionen.render();
@@ -406,24 +406,3 @@ function geschlechtText(person) {
   return person?.geschlecht ? ` · ${person.geschlecht}` : '';
 }
 
-/** Text teilen — Markdown ist kein JSON, deshalb ein eigener kleiner Weg. */
-async function teileText(inhalt, dateiname, titel, typ) {
-  const datei = new File([inhalt], dateiname, { type: typ });
-  if (navigator.canShare?.({ files: [datei] })) {
-    try {
-      await navigator.share({ files: [datei], title: titel });
-      return 'geteilt';
-    } catch (e) {
-      if (e?.name === 'AbortError') return 'abgebrochen';
-    }
-  }
-  const url = URL.createObjectURL(datei);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = dateiname;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  return 'heruntergeladen';
-}

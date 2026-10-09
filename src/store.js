@@ -13,7 +13,7 @@
  * Vor jedem Schreiben wird die Vorgängerversion als Backup gesichert (PRD §9).
  */
 
-import { KATEGORIEN, saisonListe } from './engine.js';
+import { rang, saisonListe } from './engine.js';
 
 export const SCHLUESSEL = {
   katalog: 'packliste.katalog',
@@ -58,6 +58,32 @@ function schreib(key, wert) {
     return true;
   } catch {
     return false;
+  }
+}
+
+function entfern(key) {
+  try {
+    localStorage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Liest einen JSON-Wert, den die App selbst geschrieben hat. Fehlt er oder ist
+ * er unlesbar, kommt `null` zurück — der Aufrufer entscheidet, was daraus wird
+ * (leerer Bestand, leere Einstellung, kein Katalog). Räumt iOS den Storage,
+ * landen hier ohnehin `null`-Werte, deshalb ist das der Normalfall und kein
+ * Fehler.
+ */
+function liesJsonOderLeer(key) {
+  const roh = lies(key);
+  if (!roh) return null;
+  try {
+    return JSON.parse(roh);
+  } catch {
+    return null;
   }
 }
 
@@ -162,29 +188,21 @@ export function katalogStatistik(katalog) {
     ),
     tags: tags.size,
     regeln,
-    // "Katalog-Abdeckung" (PRD §10): Anteil der Items mit gepflegter Mengenregel
+    // "Katalog-Abdeckung" (PRD §10): Anzahl der Items mit gepflegter Mengenregel
+    // (fest oder pro Tag) — nicht der Anteil, trotz des Namens der Kennzahl.
     gepflegt: regeln.fest + regeln.pro_tage,
   };
 }
 
-function rang(k) {
-  const i = KATEGORIEN.indexOf(k);
-  return i === -1 ? KATEGORIEN.length : i;
-}
-
 export function ladeKatalog() {
-  const roh = lies(SCHLUESSEL.katalog);
+  const roh = liesJsonOderLeer(SCHLUESSEL.katalog);
   if (!roh) return null;
-  try {
-    const geprueft = validiereKatalog(JSON.parse(roh));
-    if (!geprueft.ok) {
-      console.warn('Gespeicherter Katalog ist unbrauchbar:', geprueft.fehler);
-      return null;
-    }
-    return geprueft.katalog;
-  } catch {
+  const geprueft = validiereKatalog(roh);
+  if (!geprueft.ok) {
+    console.warn('Gespeicherter Katalog ist unbrauchbar:', geprueft.fehler);
     return null;
   }
+  return geprueft.katalog;
 }
 
 /**
@@ -200,11 +218,7 @@ export function speichereKatalog(katalog) {
 export function entferneKatalog() {
   const alt = lies(SCHLUESSEL.katalog);
   if (alt) schreib(SCHLUESSEL.backupKatalog, alt);
-  try {
-    localStorage.removeItem(SCHLUESSEL.katalog);
-  } catch {
-    /* egal */
-  }
+  entfern(SCHLUESSEL.katalog);
 }
 
 export function katalogBackupVorhanden() {
@@ -268,15 +282,9 @@ export function findePackliste(packlisten, reiseId, personId) {
 }
 
 export function ladeDaten() {
-  const roh = lies(SCHLUESSEL.daten);
-  if (!roh) return leereDaten();
-  try {
-    const d = JSON.parse(roh);
-    if (!d || typeof d !== 'object') return leereDaten();
-    return normalisiereDaten(d);
-  } catch {
-    return leereDaten();
-  }
+  const d = liesJsonOderLeer(SCHLUESSEL.daten);
+  if (!d || typeof d !== 'object') return leereDaten();
+  return normalisiereDaten(d);
 }
 
 /**
@@ -421,10 +429,14 @@ export async function leseJsonDatei(datei) {
  * Browser ohne Share-Unterstützung), fällt es auf einen normalen Download
  * zurück — derselbe Inhalt, nur ein anderer Weg.
  *
+ * `typ` ist der MIME-Typ des Inhalts: JSON für die Sicherungen, `text/markdown`,
+ * wenn eine Packliste geteilt wird. Das Share-Sheet am Handy entscheidet daran,
+ * welche Apps als Ziel erscheinen.
+ *
  * @returns {'geteilt'|'abgebrochen'|'heruntergeladen'|'fehler'}
  */
-export async function teileDatei(inhalt, dateiname, titel) {
-  const datei = new File([inhalt], dateiname, { type: 'application/json' });
+export async function teileDatei(inhalt, dateiname, titel, typ = 'application/json') {
+  const datei = new File([inhalt], dateiname, { type: typ });
 
   if (typeof navigator !== 'undefined' && navigator.canShare?.({ files: [datei] })) {
     try {
@@ -489,17 +501,11 @@ export async function inZwischenablage(text) {
  * @returns {{repo: string, token: string}}
  */
 export function ladeSync() {
-  const roh = lies(SCHLUESSEL.sync);
-  if (!roh) return { repo: '', token: '' };
-  try {
-    const s = JSON.parse(roh);
-    return {
-      repo: typeof s?.repo === 'string' ? s.repo : '',
-      token: typeof s?.token === 'string' ? s.token : '',
-    };
-  } catch {
-    return { repo: '', token: '' };
-  }
+  const s = liesJsonOderLeer(SCHLUESSEL.sync);
+  return {
+    repo: typeof s?.repo === 'string' ? s.repo : '',
+    token: typeof s?.token === 'string' ? s.token : '',
+  };
 }
 
 /**
