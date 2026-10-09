@@ -1,5 +1,5 @@
 /**
- * ansichtReise.js — das Reise-Formular (US-03, F3, F5, F8, F9).
+ * ansichtReise.js — das Reise-Formular (US-03, F3, F5, F9).
  *
  * Sechs Felder, mehr braucht eine Reise nicht. Alles Weitere fällt ab:
  * die Reisetage aus dem Zeitraum, die Tags aus Saison/Aktivitäten/
@@ -16,9 +16,12 @@
  * normaler Schalter — die Kategorie `Medizin` hängt an ihm, nicht an `Allgemein`,
  * und ohne diese Karte wäre er im Formular gar nicht wählbar.
  *
- * Aktivitäten sind Vorschlagsliste plus Freitext (US-03): die bekannten als
- * Schalter, unbekannte tippt man ein. Damit ist die App nicht auf die heute
- * bekannten Kontexte beschränkt (F8).
+ * Saison und Aktivitäten sind **Mehrfachauswahlen** aus dem festen Vokabular
+ * der Tag-Gruppen (engine.js, TAG_GRUPPEN). Seit 1.10 wird kein Tag mehr
+ * eingetippt: ein neuer Kontext gehört in den Katalog, sonst träfe er ohnehin
+ * kein Item. Ein Wert außerhalb des Vokabulars kann trotzdem im Bestand stehen
+ * (Altbestand oder ein zweites Gerät mit alter Version) — solche Werte kommen
+ * als entfernbare Chips mit, damit sie sichtbar und löschbar bleiben.
  */
 
 import { h, karte, feld, meldung } from './dom.js';
@@ -28,6 +31,7 @@ import {
   erzeugePackliste,
   erzeugePacklisten,
   SAISONS,
+  saisonListe,
   AKTIVITAETEN,
   VERKEHRSMITTEL,
   UNTERKUNFT,
@@ -53,7 +57,7 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
     ziel: vorhandene?.ziel ?? '',
     von: vorhandene?.von ?? '',
     bis: vorhandene?.bis ?? '',
-    saison: vorhandene?.saison ?? 'Sommer',
+    saison: vorhandene ? saisonListe(vorhandene.saison) : ['Sommer'],
     aktivitaeten: [...(vorhandene?.aktivitaeten ?? [])],
     verkehrsmittel: vorhandene?.verkehrsmittel ?? 'Flugzeug',
     unterkunft: vorhandene?.unterkunft ?? 'Ferienwohnung',
@@ -81,7 +85,7 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
 
   /* --- Bausteine ---------------------------------------------------------- */
 
-  /** Ein Schalter, genau einer aktiv (Saison, Verkehrsmittel, Unterkunft). */
+  /** Ein Schalter, genau einer aktiv (Verkehrsmittel, Unterkunft). */
   function einerAus(wert, setze, container, optionen) {
     container.replaceChildren(
       ...optionen.map((o) =>
@@ -110,6 +114,38 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
     );
   }
 
+  /**
+   * Mehrere Schalter, die gleichzeitig an sein dürfen (Saison, Aktivitäten).
+   *
+   * `lies()` gibt die aktuelle Liste, `setze()` die nächste. Werte, die nicht
+   * im Vokabular stehen, kommen als entfernbare Chips dazu: seit 1.10 kann man
+   * keine Tags mehr eintippen, aber ein Altbestand (oder ein zweites Gerät mit
+   * alter Version) kann sie tragen — ohne diese Chips wären sie unsichtbar und
+   * unlöschbar.
+   */
+  function mehrereAus(lies, setze, container, optionen, { zusatzChips = [], leerHinweis = null } = {}) {
+    const an = lies();
+    container.replaceChildren(
+      ...optionen.map((o) =>
+        h(
+          'button',
+          {
+            type: 'button',
+            class: `chip chip-schalter${an.includes(o) ? ' ist-an' : ''}`,
+            'aria-pressed': String(an.includes(o)),
+            onclick: () => {
+              setze(an.includes(o) ? an.filter((x) => x !== o) : [...an, o]);
+              aktualisiere();
+            },
+          },
+          o
+        )
+      ),
+      ...zusatzChips,
+      ...(leerHinweis && an.length === 0 ? [h('span', { class: 'klein' }, leerHinweis)] : [])
+    );
+  }
+
   function entfernbarerChip(text, onWeg) {
     return h(
       'span',
@@ -119,9 +155,9 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
     );
   }
 
-  /** Freitext-Feld zum Anlegen eines neuen Tags (F8). Enter fügt hinzu. */
+  /** Freitext-Feld zum Anlegen einer Person. Enter fügt hinzu. */
   function freitextFeld(platzhalter, onNeu) {
-    const eingabe = h('input', { type: 'text', placeholder: platzhalter, list: 'tag-vorschlaege' });
+    const eingabe = h('input', { type: 'text', placeholder: platzhalter });
     const hinzu = () => {
       const wert = eingabe.value.trim();
       if (!wert) return;
@@ -149,37 +185,24 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
     const tage = reisetage(entwurf.von, entwurf.bis);
     tageAnzeige.textContent = tage > 0 ? `${tage} ${tage === 1 ? 'Tag' : 'Tage'}` : '—';
 
-    einerAus(() => entwurf.saison, (v) => (entwurf.saison = v), saisonAnzeige, SAISONS);
+    // Saison ist eine Mehrfachauswahl: Winter + Regen ist ein normaler Fall.
+    // Ohne Saison-Tag bleibt es bei Allgemein, deshalb der Leerhinweis.
+    mehrereAus(() => entwurf.saison, (v) => (entwurf.saison = v), saisonAnzeige, SAISONS, {
+      leerHinweis: '— keiner gewählt',
+    });
     einerAus(() => entwurf.verkehrsmittel, (v) => (entwurf.verkehrsmittel = v), verkehrsAnzeige, VERKEHRSMITTEL);
     einerAus(() => entwurf.unterkunft, (v) => (entwurf.unterkunft = v), unterkunftAnzeige, UNTERKUNFT);
 
     // Aktivitäten: bekannte als Schalter, unbekannte als eigener Chip
     const unbekannt = entwurf.aktivitaeten.filter((t) => !AKTIVITAETEN.includes(t));
-    aktivitaetAnzeige.replaceChildren(
-      ...AKTIVITAETEN.map((t) =>
-        h(
-          'button',
-          {
-            type: 'button',
-            class: `chip chip-schalter${entwurf.aktivitaeten.includes(t) ? ' ist-an' : ''}`,
-            'aria-pressed': String(entwurf.aktivitaeten.includes(t)),
-            onclick: () => {
-              entwurf.aktivitaeten = entwurf.aktivitaeten.includes(t)
-                ? entwurf.aktivitaeten.filter((x) => x !== t)
-                : [...entwurf.aktivitaeten, t];
-              aktualisiere();
-            },
-          },
-          t
-        )
-      ),
-      ...unbekannt.map((t) =>
+    mehrereAus(() => entwurf.aktivitaeten, (v) => (entwurf.aktivitaeten = v), aktivitaetAnzeige, AKTIVITAETEN, {
+      zusatzChips: unbekannt.map((t) =>
         entfernbarerChip(t, () => {
           entwurf.aktivitaeten = entwurf.aktivitaeten.filter((x) => x !== t);
           aktualisiere();
         })
-      )
-    );
+      ),
+    });
 
     // Basis: Allgemein liegt fest, die Reiseapotheke ist ein Schalter
     basisAnzeige.replaceChildren(
@@ -280,33 +303,15 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
 
       // Nur die Aktivitäten, die diese Person von der Reise unterscheiden.
       const eigene = t.aktivitaeten.filter((a) => !AKTIVITAETEN.includes(a));
-      const aktivitaeten = h(
-        'div',
-        { class: 'tag-reihe' },
-        ...AKTIVITAETEN.map((a) =>
-          h(
-            'button',
-            {
-              type: 'button',
-              class: `chip chip-schalter${t.aktivitaeten.includes(a) ? ' ist-an' : ''}`,
-              'aria-pressed': String(t.aktivitaeten.includes(a)),
-              onclick: () => {
-                t.aktivitaeten = t.aktivitaeten.includes(a)
-                  ? t.aktivitaeten.filter((x) => x !== a)
-                  : [...t.aktivitaeten, a];
-                aktualisiere();
-              },
-            },
-            a
-          )
-        ),
-        ...eigene.map((a) =>
+      const aktivitaeten = h('div', { class: 'tag-reihe' });
+      mehrereAus(() => t.aktivitaeten, (v) => (t.aktivitaeten = v), aktivitaeten, AKTIVITAETEN, {
+        zusatzChips: eigene.map((a) =>
           entfernbarerChip(a, () => {
             t.aktivitaeten = t.aktivitaeten.filter((x) => x !== a);
             aktualisiere();
           })
-        )
-      );
+        ),
+      });
 
       return h(
         'div',
@@ -338,10 +343,7 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
           )
         ),
         h('div', { class: 'tag-reihe' }, h('span', { class: 'klein' }, 'Geschlecht:'), ...geschlecht),
-        h('div', { class: 'tag-reihe' }, h('span', { class: 'klein' }, 'Nur hier:'), aktivitaeten),
-        freitextFeld('Neue Aktivität für diese Person …', (a) => {
-          if (!t.aktivitaeten.includes(a)) t.aktivitaeten.push(a);
-        })
+        h('div', { class: 'tag-reihe' }, h('span', { class: 'klein' }, 'Nur hier:'), aktivitaeten)
       );
     });
 
@@ -500,11 +502,8 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
 
     karte(
       'Aktivitäten',
-      h('p', { class: 'feld-hinweis' }, 'Antippen zum An- und Abwählen. Unbekanntes einfach eintippen.'),
-      aktivitaetAnzeige,
-      freitextFeld('Neue Aktivität …', (t) => {
-        if (!entwurf.aktivitaeten.includes(t)) entwurf.aktivitaeten.push(t);
-      })
+      h('p', { class: 'feld-hinweis' }, 'Antippen zum An- und Abwählen. Mehrere gleichzeitig sind möglich.'),
+      aktivitaetAnzeige
     ),
 
     karte('Verkehrsmittel', verkehrsAnzeige),
@@ -520,10 +519,7 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
       ),
       abgeleitetAnzeige,
       h('h3', { class: 'unter-titel' }, 'Zusätzliche Tags'),
-      zusatzAnzeige,
-      freitextFeld('Eigener Tag, z. B. Tropen …', (t) => {
-        if (!entwurf.zusatz_tags.includes(t)) entwurf.zusatz_tags.push(t);
-      })
+      zusatzAnzeige
     ),
 
     h(
@@ -543,15 +539,7 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
       : null
   );
 
-  const datalist = h(
-    'datalist',
-    { id: 'tag-vorschlaege' },
-    ...[...new Set([...AKTIVITAETEN, 'Regen', 'Tropen', 'Übergangszeit'])]
-      .sort((a, b) => a.localeCompare(b, 'de'))
-      .map((t) => h('option', { value: t }))
-  );
-
   aktualisiere();
 
-  return h('div', { class: 'stapel' }, h('h1', {}, vorhandene ? 'Reise bearbeiten' : 'Neue Reise'), formular, datalist);
+  return h('div', { class: 'stapel' }, h('h1', {}, vorhandene ? 'Reise bearbeiten' : 'Neue Reise'), formular);
 }

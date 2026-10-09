@@ -151,7 +151,7 @@
         await warte();
         pruefe('wieder alle sichtbar', Boolean(app.querySelector('.pos.ist-gepackt')));
 
-        /* 8 — Formular mit Tag-Ableitung (US-03, F8, F9) */
+        /* 8 — Formular mit Tag-Ableitung (US-03, F3, F9) */
         location.hash = '#/reise/smoke-1';
         await warte();
         pruefe('Formular öffnet', text().includes('Reise bearbeiten'));
@@ -161,13 +161,25 @@
         const schalter = [...app.querySelectorAll('.chip-schalter')];
         pruefe('Saison-Schalter vorhanden', schalter.length > 10);
 
-        // neuen Tag eintippen (F8)
-        const frei = [...app.querySelectorAll('.freitext input')].at(-1);
-        frei.value = 'Tropen';
-        frei.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        // Tags werden nicht mehr eingetippt (1.10) — dafür ist Saison eine
+        // Mehrfachauswahl. Der Bestand oben trägt `saison` noch als String
+        // ('Sommer'); er muss als gewählter Chip ankommen.
+        const saisonChip = (t) => [...app.querySelectorAll('.chip-schalter')].find((c) => c.textContent === t);
+        pruefe('Altbestand: Saison-Chip ist vorbelegt', Boolean(saisonChip('Sommer')?.classList.contains('ist-an')));
+
+        // Winter tritt neben den vorhandenen Sommer, Regen gleichzeitig dazu.
+        for (const t of ['Winter', 'Regen']) {
+          saisonChip(t)?.click();
+          await warte();
+        }
+        pruefe(
+          'Sommer, Winter und Regen gleichzeitig an',
+          ['Sommer', 'Winter', 'Regen'].every((t) => saisonChip(t)?.classList.contains('ist-an'))
+        );
+        pruefe('Winter steht in den abgeleiteten Tags', Boolean(saisonChip('Winter ×')));
+        saisonChip('Regen')?.click();
         await warte();
-        pruefe('neuer Tag angelegt', [...app.querySelectorAll('.chip-eigen')].some((c) => c.textContent.includes('Tropen')));
-        pruefe('neuer Tag wirkt in den Reise-Tags', [...app.querySelectorAll('.chip-ruhig')].some((c) => c.textContent === 'Tropen'));
+        pruefe('Regen wieder abwählbar', Boolean(!saisonChip('Regen')?.classList.contains('ist-an')));
 
         /* 8b — Personen (PRD §4.6). Zwei Personen auf einer Reise, jede mit
            ihrem Geschlecht und einer eigenen Aktivität. Geprüft wird, dass
