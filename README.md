@@ -5,6 +5,11 @@ eine vollständige Packliste — mit Mengen, gruppiert nach Kategorie, abhakbar.
 
 Reine Browser-App. Kein Backend, keine Datenbank, keine Konten.
 
+> **Die App benutzen wollen, nicht entwickeln?** Dann ist
+> [ANLEITUNG.md](ANLEITUNG.md) die richtige Datei — sie erklärt von Null aus,
+> wie man sein eigenes Daten-Repo aufsetzt. Dieses README hier ist für die
+> Entwicklung.
+
 ## Loslegen
 
 ```bash
