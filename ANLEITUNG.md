@@ -161,9 +161,9 @@ Taschen & Ordnung        Verpflegung     Haushalt & Sonstiges
 |---|---|
 | Basis | `Allgemein`, `Reiseapotheke` |
 | Klima / Saison | `Winter`, `Sommer`, `Übergangszeit`, `Regen` |
-| Verkehrsmittel | `Flugzeug`, `Auto`, `Zug` |
+| Verkehrsmittel | `Flugzeug` |
 | Aktivität | `Tauchen`, `Festival`, `Wandern`, `Strand`, `Ski`, `Arbeit`, `Fotografie`, `UW-Fotografie` |
-| Unterkunft | `Camping`, `Ferienwohnung`, `Hotel`, `Hostel`, `Freunde` |
+| Unterkunft | `Camping`, `Ferienwohnung`, `Hotel`, `Hostel` |
 | Person | `Damen`, `Herren` — **nur** in `nicht_mit`, siehe unten |
 
 **`menge`** — drei Formen:
