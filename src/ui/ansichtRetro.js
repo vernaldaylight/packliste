@@ -5,9 +5,10 @@
  * anlegen" setzt einen schreibenden Katalog-Editor voraus und wandert mit
  * FF-16 (PRD §3.3, §14) — im MVP wird das Item per Repo-Commit angelegt.
  *
- * Damit dieser Commit leichtfällt, stehen die Tags der Reise hier als
- * kopierbare Zeile bereit: genau die Tags, die das neue Item in
- * katalog.json des Daten-Repos tragen muss, damit es künftig ausgewählt wird.
+ * Damit dieser Commit leichtfällt, stehen die Tags der Reise hier sichtbar
+ * unter der Karte, und die Item-Vorlage trägt sie bereits in ihrem `tags`-Feld:
+ * genau die Tags, die das neue Item in katalog.json des Daten-Repos tragen
+ * muss, damit es künftig ausgewählt wird.
  */
 
 import { h, karte, meldung } from './dom.js';
@@ -82,18 +83,6 @@ export function ansichtRetro({ daten, aktionen, reiseId }) {
       h(
         'div',
         { class: 'knopf-reihe' },
-        h(
-          'button',
-          {
-            class: 'knopf',
-            onclick: async () => {
-              const ok = await inZwischenablage(tags.join(', '));
-              aktionen.melde(ok ? 'Tags kopiert.' : 'Kopieren ging nicht.', ok ? 'ok' : 'fehler');
-              aktionen.render();
-            },
-          },
-          'Tags kopieren'
-        ),
         h(
           'button',
           {
