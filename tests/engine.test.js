@@ -271,7 +271,7 @@ test('Verkehrsmittel ist ein Tag wie jeder andere (O7)', () => {
   assert.deepEqual([...tags].sort(), ['Allgemein', 'Flugzeug'], 'und sonst kommt nichts dazu');
 });
 
-test('Auto, Zug und Freunde sind entfallen (1.11)', () => {
+test('Auto, Zug und Freunde sind entfallen (1.13)', () => {
   // Sie trugen kein einziges Item: eine Auswahl hätte an keiner Liste etwas
   // geändert. `Hotel` und `Übergangszeit` bleiben — beide sind leer, aber
   // plausibel; die beiden Listen kommen aus `TAG_GRUPPEN`.

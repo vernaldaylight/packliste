@@ -27,7 +27,7 @@ Die App startet ohne Katalog und zeigt die Aufforderung. Zwei Wege führen hinei
 Danach bleibt der Katalog im `localStorage` des Browsers.
 
 ```bash
-npm test             # 81 Tests: Regel-Engine, Persistenz, Synchronisierung
+npm test             # Tests für Regel-Engine, Persistenz und Synchronisierung
 npm run build        # dist/ — nur die App-Hülle
 ```
 

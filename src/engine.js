@@ -40,7 +40,7 @@ export const KATEGORIEN = [
  * Datenmodell nicht.
  *
  * Diese Liste ist das Vokabular: sie bestimmt, was im Formular wählbar ist.
- * `Auto`, `Zug` und `Freunde` sind in 1.11 entfallen — kein Item trug sie.
+ * `Auto`, `Zug` und `Freunde` sind in 1.13 entfallen — kein Item trug sie.
  */
 export const TAG_GRUPPEN = [
   { gruppe: 'Basis', tags: ['Allgemein', 'Reiseapotheke'] },
@@ -84,10 +84,7 @@ export const SAISONS = TAG_GRUPPEN.find((g) => g.gruppe === 'Klima / Saison').ta
 export const VERKEHRSMITTEL = TAG_GRUPPEN.find((g) => g.gruppe === 'Verkehrsmittel').tags;
 export const UNTERKUNFT = TAG_GRUPPEN.find((g) => g.gruppe === 'Unterkunft').tags;
 
-/**
- * Aktivitäten ohne die Unterkunft-Tags — die stehen im Formular in einem
- * eigenen Feld und dürfen dort nicht doppelt als Vorschlag auftauchen.
- */
+/** Die Aktivitäten aus dem Vokabular — das Formular baut daraus seine Schalter. */
 export const AKTIVITAETEN = TAG_GRUPPEN.find((g) => g.gruppe === 'Aktivität').tags;
 
 /**

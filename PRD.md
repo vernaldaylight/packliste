@@ -31,8 +31,8 @@ Eine Web-App, die aus einem festen Item-Katalog und einem beschriebenen Reise-Pr
 - Solo-Projekt, reine Browser-App, kein Backend-Prozess, keine Datenbank
 - Auslieferung: statisch gehostet, damit die Liste auch am Handy verfügbar ist (§3.6)
 - Stack: Vite + Vanilla JS
-- Persistenz: `katalog.json` als versionierte Datei im Repo (**nicht deployt**), am Handy per Button importiert; Reisen im `localStorage` des Handys (§4.5)
-- Datentransfer Mac ⇄ Handy: per Button über Dateien (iCloud Drive, AirDrop, Mail) — keine automatische Synchronisierung
+- Persistenz: `katalog.json` und `reisen.json` als versionierte Dateien im privaten Daten-Repo (**nicht deployt**); am Gerät ist der `localStorage` die Arbeitskopie (§4.5)
+- Datentransfer Mac ⇄ Handy: ausdrücklicher Knopf am Handy (GitHub Contents API, US-11) — **keine** Synchronisierung beim Start, im Hintergrund oder blockierend; ohne Netz bleiben die Dateiwege (US-09, US-10)
 - Das Deployment enthält nur die App-Hülle, keine persönlichen Daten
 - Herkunft: Praxisprojekt im Agentic-Coding-Kurs, danach dauerhafte private Nutzung
 
@@ -121,7 +121,7 @@ Das Vokabular der Kontexte steht fest: fünf Gruppen in `TAG_GRUPPEN` (Basis, Kl
 | F14 | Reise-Daten aus dem Gerät herausbringen (US-10) | P0 |
 | F15 | Katalog und Reisen über das private Daten-Repo abgleichen (US-11) | P0 |
 
-**Pflegeweg im MVP**: Der Katalog wird **nicht** über eine UI bearbeitet, sondern im privaten Daten-Repo — Import-Skript für den Erstaufbau, danach gezielte Änderungen an `katalog.json` (§3.6). Der Grund ist die Größe: 333 Items, deren Mengenregeln nach dem Import fast alle noch auf `einmal` stehen. Diese Arbeit ist Bulk-Arbeit und gehört in ein Skript, nicht in hunderte Klicks. Das Ventil für Einzelfälle bleibt US-05 (Overrides pro Reise).
+**Pflegeweg im MVP**: Der Katalog wird **nicht** über eine UI bearbeitet, sondern im privaten Daten-Repo — Import-Skript für den Erstaufbau, danach gezielte Änderungen an `katalog.json` (§3.6). Der Grund ist die Größe: 262 Items, deren Mengenregeln nach dem Import fast alle noch auf `einmal` stehen. Diese Arbeit ist Bulk-Arbeit und gehört in ein Skript, nicht in hunderte Klicks. Das Ventil für Einzelfälle bleibt US-05 (Overrides pro Reise).
 
 ### 3.4 Out of Scope (MVP)
 
@@ -147,7 +147,7 @@ Das Vokabular der Kontexte steht fest: fünf Gruppen in `TAG_GRUPPEN` (Basis, Kl
 
 **Entschieden am 2026-10-07, Datentransfer nachgeschärft am 2026-10-08, auf zwei Repos umgestellt am 2026-10-08.** Leitfrage war: Braucht diese App ein Backend? Nein — und diese Antwort bestimmt jede weitere Entscheidung.
 
-Die App hat genau zwei Aufgaben, die man auslagern *könnte*: **Persistenz** und die **Regel-Engine**. Die Engine ist eine reine Funktion über den Katalog (Tag-Schnittmenge plus Mengenformel) und rechnet bei 333 Items in unter einer Millisekunde — sie gehört in den Browser. Für die Persistenz braucht es keine Transaktionen, keine Mehrbenutzer und keine Geheimnisse. Damit fällt jeder Server-Anteil weg: ein getrenntes Frontend/Backend oder ein Python-Backend würde nur einen zweiten Prozess hinzufügen, den man starten muss, bevor die App funktioniert — für null Gegenwert.
+Die App hat genau zwei Aufgaben, die man auslagern *könnte*: **Persistenz** und die **Regel-Engine**. Die Engine ist eine reine Funktion über den Katalog (Tag-Schnittmenge plus Mengenformel) und rechnet bei 262 Items in unter einer Millisekunde — sie gehört in den Browser. Für die Persistenz braucht es keine Transaktionen, keine Mehrbenutzer und keine Geheimnisse. Damit fällt jeder Server-Anteil weg: ein getrenntes Frontend/Backend oder ein Python-Backend würde nur einen zweiten Prozess hinzufügen, den man starten muss, bevor die App funktioniert — für null Gegenwert.
 
 | Baustein | Entscheidung | Begründung |
 |---|---|---|
@@ -160,7 +160,7 @@ Die App hat genau zwei Aufgaben, die man auslagern *könnte*: **Persistenz** und
 | Katalog-Transport | **Datei per Button** *und* Sync: `katalog.json` kommt aus dem Daten-Repo oder über die Dateiauswahl aus iCloud Drive | iOS-Safari hat **keine** File System Access API — ein Schreibweg in iCloud existiert dort nicht. Bei fehlendem Netz ist die Datei der einzige Weg, deshalb bleibt sie erhalten |
 | Datenspeicherung am Handy | **`localStorage`** für Katalog **und** Reisen | Die Arbeitskopie. Eine Speicherquelle, ein Importweg, und der Sync liest und schreibt immer nur von hier |
 | Datenrückweg | Wenn Sync: `reisen.json` im Daten-Repo. Sonst: **Share-Sheet** (`navigator.share`) → iCloud Drive, AirDrop oder Mail | Beide Wege bleiben — ohne Token oder ohne Netz ist der Export der Notausgang |
-| Katalog-Pflege | **Daten-Repo + Import-Skript**, keine UI im MVP | Bulk-Arbeit an 333 Items gehört in Skript und git, nicht in Klicks (§3.3) |
+| Katalog-Pflege | **Daten-Repo + Import-Skript**, keine UI im MVP | Bulk-Arbeit an 262 Items gehört in Skript und git, nicht in Klicks (§3.3) |
 | Offline | Nicht im MVP | Ohne Service Worker braucht die Seite Netz. Der Markdown-Export (F10) ist der Offline-Pfad; PWA bleibt FF-12 |
 
 **Warum Python trotzdem vorkommt — aber nicht als Backend.** Der einzige Ort, an dem Python hier glänzt, ist der **Excel-Import** (§6): Semikolon als Trennzeichen, UTF-8-Umlaute, Formel-Spalten mit doppelten Spaltennamen. Das ist ein **einmaliges Migrationsskript** `quellen/ → katalog.json`, kein laufender Dienst.
@@ -697,7 +697,7 @@ Solo, Abendarbeit, parallel zum Kurs. Vier Wochen bis nutzbarer MVP.
 
 | Woche | Meilenstein | Ergebnis | Fertig, wenn |
 |---|---|---|---|
-| 1 | Fundament + Katalog | Vite-Setup, JSON-Schema, `engine.js` mit Tests, `katalog.json` aus dem Import-Skript | Die Engine wählt aus 333 echten Items korrekt aus — testbar ohne eine einzige Ansicht |
+| 1 | Fundament + Katalog | Vite-Setup, JSON-Schema, `engine.js` mit Tests, `katalog.json` aus dem Import-Skript | Die Engine wählt aus 262 echten Items korrekt aus — testbar ohne eine einzige Ansicht |
 | 2 | Reise-Formular + Persistenz | Katalog-Import (US-09), Leerer-Zustand (FR19), Reise anlegen, Tag-Ableitung, `store.js` (localStorage, Backup, Share-Export), Deployment der App-Hülle | Eine Reise ist **am Handy** beschreibbar, überlebt einen Neustart und lässt sich als Datei sichern |
 | 3 | Ausgabe | Gruppierte Liste, Mengen sichtbar, Abhaken | Eine echte Reise erzeugt eine brauchbare Liste |
 | 4 | Feinschliff | Markdown-Export, Retro-Freitext, Overrides, Katalogpflege über Repo erproben | Erste echte Reise wird damit gepackt |
@@ -745,7 +745,7 @@ Item-CRUD, Mengenregel-Editor mit Live-Vorschau (FR3), Liste filterbar nach Kate
 
 **Zieht zwei Fragen mit sich**, die dann zu entscheiden sind: Wird der Katalog am Handy dadurch schreibbar (Stufe C), und wie werden Items zusammengeführt (`import/erwartungen.json` ist mit dem Umzug ins private Repo aus dem öffentlichen Testpfad heraus). Die Live-Vorschau wird erst mit ihm möglich. Und der Retro-Direktweg (US-08/FR15) setzt ihn voraus.
 
-**Warum verschoben**: Der Erstaufbau des Katalogs ist Bulk-Arbeit an 333 Items und gehört in ein Skript. Für die ersten echten Reisen genügt das Repo als Pflegeweg. Der Editor lohnt sich erst, wenn der Katalog steht und Einzeländerungen häufig werden.
+**Warum verschoben**: Der Erstaufbau des Katalogs ist Bulk-Arbeit an 262 Items und gehört in ein Skript. Für die ersten echten Reisen genügt das Repo als Pflegeweg. Der Editor lohnt sich erst, wenn der Katalog steht und Einzeländerungen häufig werden.
 
 **Was ohne ihn fehlt**: die Live-Vorschau der Mengenregel (§4.2), der Direktweg Retro → Item (US-08/FR15) und die Tag-Verwaltung (FF-11).
 
@@ -906,7 +906,7 @@ Dabei entstehen zwei Lücken, die der Import-Report (F7) ausweisen muss:
 | Lokaler Server auf dem Laptop | Hätte echte Dateien mit dem Handy verbunden, aber nur solange der Laptop läuft und im selben WLAN ist — genau der Fall, den das Packen unterwegs ausschließt |
 | `localStorage` für den Katalog | Nicht versionierbar, kein `git diff`, kein Undo, und auf iOS räumungsgefährdet. Der Schatz gehört in eine Datei (§4.5) |
 | UI-Framework (React/Svelte/Vue) | Fünf Ansichten, deren Kern eine reine Funktion ist. Vanilla JS reicht und spart eine Abhängigkeit |
-| Katalog-Editor im MVP | Bulk-Arbeit an 333 Items gehört in ein Skript. Der Editor lohnt sich erst, wenn der Katalog steht (FF-16) |
+| Katalog-Editor im MVP | Bulk-Arbeit an 262 Items gehört in ein Skript. Der Editor lohnt sich erst, wenn der Katalog steht (FF-16) |
 | Katalog im Deployment (Weg 1) | Hätte das Handy automatisch aktuell gehalten, aber `katalog.json` wäre über die Deploy-URL für jeden abrufbar — und ein Zugriffsschutz hätte auf iOS einen Login-Schritt gekostet. Der Import per Button ist der billigere Preis (O11) |
 | **Secret Gist als Datenspeicher** | „Secret" heißt bei GitHub nur *nicht gelistet* — jeder mit der URL liest mit; ein privater Gist existiert nicht. Dazu deckt ein Gist-Token **alle** Gists ab, ein fein granuliertes Repo-Token genau eines. Ein Link, der einmal in einem Repo, Bundle oder Verlauf steht, ist nicht mehr zurückzuholen (O12) |
 | **Proxy für die GitHub-API** | Für nötig gehalten, dann gemessen: `api.github.com` erlaubt CORS inklusive Preflight für authentifizierte `PUT` (`allow-origin: *`). Ein Proxy hätte einen Server hinzugefügt, den diese App sonst nirgends braucht |
