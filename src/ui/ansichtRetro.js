@@ -32,6 +32,7 @@ export function ansichtRetro({ daten, aktionen, reiseId }) {
   const feld = h('textarea', {
     class: 'retro-text',
     rows: '8',
+    'aria-label': 'Was hat gefehlt?',
     placeholder: 'z. B. Blasenpflaster gefehlt — die Wanderung war länger als geplant.',
     oninput: (e) => (text = e.target.value),
   });

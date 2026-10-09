@@ -25,6 +25,9 @@ import {
 } from '../engine.js';
 import { inZwischenablage, teileDatei, zeitstempel, findePackliste } from '../store.js';
 
+/** So viele Suchtreffer werden angeboten — mehr braucht das Hinzufügen nicht. */
+const MAX_TREFFER = 40;
+
 export function ansichtListe({ katalog, daten, aktionen, reiseId, personId = null }) {
   const reise = daten.reisen.find((r) => r.id === reiseId) ?? null;
   if (!reise) {
@@ -314,7 +317,7 @@ export function ansichtListe({ katalog, daten, aktionen, reiseId, personId = nul
    * Häkchen neu entstehen, wäre die Sucheingabe nach jedem Klick wieder leer.
    */
   function hinzufuegenKarte() {
-    const suchfeld = h('input', { type: 'text', placeholder: 'Item suchen …', class: 'suche' });
+    const suchfeld = h('input', { type: 'text', placeholder: 'Item suchen …', 'aria-label': 'Item suchen', class: 'suche' });
     // Eigene Klassen: die Trefferliste darf nicht wie die Packliste aussehen
     // und nicht mit ihr verwechselt werden.
     const treffer = h('ul', { class: 'treffer-liste' });
@@ -323,7 +326,7 @@ export function ansichtListe({ katalog, daten, aktionen, reiseId, personId = nul
       const aufDerListe = new Set(liste.positionen.map((p) => p.item_id));
       const q = suchfeld.value.trim().toLowerCase();
       const rest = katalog.items.filter((i) => !aufDerListe.has(i.id));
-      const gefiltert = (q ? rest.filter((i) => i.name.toLowerCase().includes(q)) : rest).slice(0, 40);
+      const gefiltert = (q ? rest.filter((i) => i.name.toLowerCase().includes(q)) : rest).slice(0, MAX_TREFFER);
 
       treffer.replaceChildren(
         ...(gefiltert.length === 0

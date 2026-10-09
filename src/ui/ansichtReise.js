@@ -74,14 +74,14 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
   /* --- Container, die aktualisiere() neu füllt ---------------------------- */
 
   const tageAnzeige = h('strong', { class: 'wert' });
-  const personenAnzeige = h('div', { class: 'person-reihe' });
+  const personenAnzeige = h('ul', { class: 'person-reihe' });
   const basisAnzeige = h('div', { class: 'tag-reihe' });
   const saisonAnzeige = h('div', { class: 'tag-reihe' });
   const aktivitaetAnzeige = h('div', { class: 'tag-reihe' });
   const verkehrsAnzeige = h('div', { class: 'tag-reihe' });
   const unterkunftAnzeige = h('div', { class: 'tag-reihe' });
   const abgeleitetAnzeige = h('div', { class: 'tag-reihe' });
-  const zusatzAnzeige = h('div', { class: 'tag-reihe' });
+  const zusatzAnzeige = h('div', { class: 'stapel' });
 
   /* --- Bausteine ---------------------------------------------------------- */
 
@@ -163,7 +163,7 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
 
   /** Freitext-Feld zum Anlegen einer Person. Enter fügt hinzu. */
   function freitextFeld(platzhalter, onNeu) {
-    const eingabe = h('input', { type: 'text', placeholder: platzhalter });
+    const eingabe = h('input', { type: 'text', placeholder: platzhalter, 'aria-label': platzhalter });
     const hinzu = () => {
       const wert = eingabe.value.trim();
       if (!wert) return;
@@ -233,17 +233,26 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
       })
     );
 
-    // Zusatz-Tags (frei eingetippt) — ohne die Basis-Tags, die oben ihren Schalter haben
+    // Altbestand an Zusatz-Tags: Werte, die der Katalog nicht kennt und die
+    // seit 1.11 nicht mehr eingetippt werden können. Gibt es keinen, fällt der
+    // ganze Block samt Überschrift weg — ein „noch keine" erklärt nichts.
     const eigeneTags = entwurf.zusatz_tags.filter((t) => !WAHLBARE_BASIS_TAGS.includes(t));
     zusatzAnzeige.replaceChildren(
       ...(eigeneTags.length === 0
-        ? [h('span', { class: 'klein' }, 'noch keine')]
-        : eigeneTags.map((t) =>
-            entfernbarerChip(t, () => {
-              entwurf.zusatz_tags = entwurf.zusatz_tags.filter((x) => x !== t);
-              aktualisiere();
-            })
-          ))
+        ? []
+        : [
+            h('h3', { class: 'unter-titel' }, 'Zusätzliche Tags'),
+            h(
+              'div',
+              { class: 'tag-reihe' },
+              ...eigeneTags.map((t) =>
+                entfernbarerChip(t, () => {
+                  entwurf.zusatz_tags = entwurf.zusatz_tags.filter((x) => x !== t);
+                  aktualisiere();
+                })
+              )
+            ),
+          ])
     );
 
     // Abgeleitete Tags: sichtbar, einzeln entfernbar (US-03). Allgemein steht
@@ -320,7 +329,7 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
       });
 
       return h(
-        'div',
+        'li',
         { class: 'person-zeile' },
         h(
           'div',
@@ -363,7 +372,7 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
     const hinzufuegen =
       bekannt.length > 0
         ? h(
-            'div',
+            'li',
             { class: 'knopf-reihe' },
             ...bekannt.map((p) =>
               h(
@@ -521,7 +530,6 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
         'Das kommt aus deinen Angaben. Antippen streicht einen Tag für diese Reise; mit ↺ holst du ihn zurück.'
       ),
       abgeleitetAnzeige,
-      h('h3', { class: 'unter-titel' }, 'Zusätzliche Tags'),
       zusatzAnzeige
     ),
 

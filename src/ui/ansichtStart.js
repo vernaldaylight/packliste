@@ -16,6 +16,9 @@ import { findePackliste } from '../store.js';
 import { importiereKatalog } from './dateien.js';
 import { zieheKatalog } from './syncUi.js';
 
+/** So viele Tags zeigt das Reisekärtchen, der Rest wird als „+n" gezählt. */
+const MAX_TAGS_AM_KAERTCHEN = 8;
+
 export function ansichtStart(zustand) {
   return zustand.katalog ? uebersicht(zustand) : importAufforderung(zustand);
 }
@@ -147,8 +150,10 @@ function reiseZeile(reise, daten, aktionen) {
     h(
       'p',
       { class: 'tag-reihe' },
-      ...tags.slice(0, 8).map((t) => h('span', { class: 'chip chip-ruhig' }, t)),
-      tags.length > 8 ? h('span', { class: 'klein' }, `+${tags.length - 8}`) : null
+      ...tags.slice(0, MAX_TAGS_AM_KAERTCHEN).map((t) => h('span', { class: 'chip chip-ruhig' }, t)),
+      tags.length > MAX_TAGS_AM_KAERTCHEN
+        ? h('span', { class: 'klein' }, `+${tags.length - MAX_TAGS_AM_KAERTCHEN}`)
+        : null
     ),
 
     // Eine Fortschrittszeile je Person, jede führt auf ihre eigene Liste.

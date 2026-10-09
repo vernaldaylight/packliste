@@ -92,9 +92,12 @@ export function meldung(text, art = 'info') {
   return h('div', { class: `meldung meldung-${art}`, role: art === 'fehler' ? 'alert' : 'status' }, text);
 }
 
+/** Wie viele Fehlerzeilen eine Meldung zeigt, bevor sie abkürzt. */
+const MAX_FEHLER = 8;
+
 /** Eine Fehlerliste, wie sie die Validierung liefert (US-09). */
 export function fehlerListe(fehler) {
-  const sichtbar = fehler.slice(0, 8);
+  const sichtbar = fehler.slice(0, MAX_FEHLER);
   return h(
     'div',
     { class: 'meldung meldung-fehler', role: 'alert' },

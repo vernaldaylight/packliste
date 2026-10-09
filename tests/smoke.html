@@ -158,6 +158,9 @@
         pruefe('Reisetage berechnet', text().includes('10 Tage'));
         pruefe('abgeleitete Tags sichtbar', text().includes('Ferienwohnung'));
         pruefe('Zusatz-Tag als eigener Chip', Boolean(app.querySelector('.chip-eigen')));
+        // Ohne Altbestand fällt der Block „Zusätzliche Tags" ganz weg — statt
+        // eines „noch keine", das nichts erklärt.
+        pruefe('kein „noch keine" im Formular', !text().includes('noch keine'));
         const schalter = [...app.querySelectorAll('.chip-schalter')];
         pruefe('Saison-Schalter vorhanden', schalter.length > 10);
 
