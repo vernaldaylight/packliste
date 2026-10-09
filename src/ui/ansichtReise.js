@@ -26,6 +26,7 @@ import {
   tripTags,
   abgeleiteteTags,
   erzeugePackliste,
+  erzeugePacklisten,
   SAISONS,
   AKTIVITAETEN,
   VERKEHRSMITTEL,
@@ -58,13 +59,18 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
     unterkunft: vorhandene?.unterkunft ?? 'Ferienwohnung',
     zusatz_tags: [...(vorhandene?.zusatz_tags ?? [])],
     entfernte_tags: [...(vorhandene?.entfernte_tags ?? [])],
+    // Wer mitfährt, ist eine Eigenschaft der Reise; das Geschlecht eine der
+    // Person (PRD §4.6). Hier steht deshalb nur die Verknüpfung.
+    teilnehmer: (vorhandene?.teilnehmer ?? []).map((t) => ({ ...t, aktivitaeten: [...(t.aktivitaeten ?? [])] })),
   };
 
-  const hatListe = Boolean(daten.packlisten.find((p) => p.reise_id === entwurf.id));
+  /** Ein Eintrag für jede erzeugte Liste — eine Reise kann mehrere haben. */
+  const hatListe = daten.packlisten.some((p) => p.reise_id === entwurf.id);
 
   /* --- Container, die aktualisiere() neu füllt ---------------------------- */
 
   const tageAnzeige = h('strong', { class: 'wert' });
+  const personenAnzeige = h('div', { class: 'person-reihe' });
   const basisAnzeige = h('div', { class: 'tag-reihe' });
   const saisonAnzeige = h('div', { class: 'tag-reihe' });
   const aktivitaetAnzeige = h('div', { class: 'tag-reihe' });
@@ -235,11 +241,159 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
       })
     );
 
+    zeichnePersonen();
+
     // Die tatsächlich wirksame Tag-Menge — der Input der Engine
     wirksamAnzeige.replaceChildren(
       ...[...tripTags(entwurf)].sort().map((t) => h('span', { class: 'chip chip-ruhig' }, t))
     );
   }
+
+  /* --- Personen (PRD §4.6) ------------------------------------------------ */
+
+  /**
+   * Wer mitfährt: je Teilnehmer eine Zeile mit Name, Geschlecht und den
+   * Aktivitäten, die **nur diese Person** hat.
+   *
+   * Das Geschlecht schreibt in das globale Register (`daten.personen`), die
+   * Aktivitäten in `entwurf.teilnehmer` — sie gehören zu dieser Reise. Beides
+   * wird erst beim Speichern festgeschrieben; die Ansicht arbeitet auf Kopien.
+   */
+  function zeichnePersonen() {
+    const bekannt = daten.personen.filter((p) => !entwurf.teilnehmer.some((t) => t.person_id === p.id));
+
+    const zeilen = entwurf.teilnehmer.map((t) => {
+      const person = daten.personen.find((p) => p.id === t.person_id);
+      if (!person) return null;
+
+      const geschlecht = ['weiblich', 'maennlich', ''].map((g) =>
+        h(
+          'button',
+          {
+            type: 'button',
+            class: `chip chip-schalter${(person.geschlecht ?? '') === g ? ' ist-an' : ''}`,
+            'aria-pressed': String((person.geschlecht ?? '') === g),
+            onclick: () => {
+              aktionen.aktualisierePerson(person.id, { geschlecht: g });
+              aktualisiere();
+            },
+          },
+          g || 'ohne Angabe'
+        )
+      );
+
+      // Nur die Aktivitäten, die diese Person von der Reise unterscheiden.
+      const eigene = t.aktivitaeten.filter((a) => !AKTIVITAETEN.includes(a));
+      const aktivitaeten = h(
+        'div',
+        { class: 'tag-reihe' },
+        ...AKTIVITAETEN.map((a) =>
+          h(
+            'button',
+            {
+              type: 'button',
+              class: `chip chip-schalter${t.aktivitaeten.includes(a) ? ' ist-an' : ''}`,
+              'aria-pressed': String(t.aktivitaeten.includes(a)),
+              onclick: () => {
+                t.aktivitaeten = t.aktivitaeten.includes(a)
+                  ? t.aktivitaeten.filter((x) => x !== a)
+                  : [...t.aktivitaeten, a];
+                aktualisiere();
+              },
+            },
+            a
+          )
+        ),
+        ...eigene.map((a) =>
+          entfernbarerChip(a, () => {
+            t.aktivitaeten = t.aktivitaeten.filter((x) => x !== a);
+            aktualisiere();
+          })
+        )
+      );
+
+      return h(
+        'div',
+        { class: 'person-zeile' },
+        h(
+          'div',
+          { class: 'kopf-reihe' },
+          h('input', {
+            type: 'text',
+            value: person.name,
+            'aria-label': 'Name der Person',
+            oninput: (e) => {
+              // Ins Register, aber ohne Neuzeichnen — sonst verlöre das Feld bei
+              // jedem Tastendruck den Fokus.
+              aktionen.aktualisierePerson(person.id, { name: e.target.value });
+            },
+          }),
+          h(
+            'button',
+            {
+              type: 'button',
+              class: 'knopf knopf-leise',
+              onclick: () => {
+                entwurf.teilnehmer = entwurf.teilnehmer.filter((x) => x.person_id !== person.id);
+                aktualisiere();
+              },
+            },
+            'Nicht dabei'
+          )
+        ),
+        h('div', { class: 'tag-reihe' }, h('span', { class: 'klein' }, 'Geschlecht:'), ...geschlecht),
+        h('div', { class: 'tag-reihe' }, h('span', { class: 'klein' }, 'Nur hier:'), aktivitaeten),
+        freitextFeld('Neue Aktivität für diese Person …', (a) => {
+          if (!t.aktivitaeten.includes(a)) t.aktivitaeten.push(a);
+        })
+      );
+    });
+
+    const hinzufuegen =
+      bekannt.length > 0
+        ? h(
+            'div',
+            { class: 'knopf-reihe' },
+            ...bekannt.map((p) =>
+              h(
+                'button',
+                {
+                  type: 'button',
+                  class: 'knopf',
+                  onclick: () => {
+                    entwurf.teilnehmer.push({ person_id: p.id, aktivitaeten: [] });
+                    aktualisiere();
+                  },
+                },
+                `+ ${p.name}`
+              )
+            )
+          )
+        : null;
+
+    personenAnzeige.replaceChildren(
+      ...(entwurf.teilnehmer.length === 0
+        ? [
+            h(
+              'p',
+              { class: 'feld-hinweis' },
+              'Ohne Personen entsteht eine Liste für die Reise als Ganzes. Mit Personen entsteht je Person eine eigene Liste — mit ihrem Geschlecht und ihren eigenen Aktivitäten.'
+            ),
+          ]
+        : zeilen.filter(Boolean)),
+      hinzufuegen
+    );
+  }
+
+  /**
+   * Das Feld zum Anlegen einer Person steht **neben** der Personenliste, nicht
+   * darin: `zeichnePersonen` baut den Container bei jeder Änderung neu auf, und
+   * ein Feld darin verlöre nach jedem Hinzufügen den Fokus.
+   */
+  const neuePersonFeld = freitextFeld('Neue Person …', (name) => {
+    const person = aktionen.legePersonAn({ name });
+    entwurf.teilnehmer.push({ person_id: person.id, aktivitaeten: [] });
+  });
 
   /* --- Speichern ---------------------------------------------------------- */
 
@@ -272,9 +426,24 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
     }
 
     if (undListe) {
-      aktionen.setzePackliste(reise.id, erzeugePackliste(katalog, reise));
-      aktionen.melde(`Liste für „${reise.name}" erzeugt.`, 'ok');
-      return aktionen.gehe(`/liste/${reise.id}`);
+      // Eine Liste je Teilnehmer (PRD §4.6) — ohne Teilnehmer die eine Liste
+      // für die Reise als Ganzes.
+      const listen = erzeugePacklisten(katalog, reise, daten.personen, reise.teilnehmer);
+      // Wird die Reise personenbezogen, tritt die alte Liste für „die Reise als
+      // Ganzes" ab — sonst bliebe sie unerreichbar im Bestand stehen und würde
+      // für immer mit synchronisiert.
+      if (listen.length > 0) aktionen.loeschePackliste(reise.id, null);
+      for (const liste of listen) aktionen.setzePackliste(reise.id, liste.person_id, liste);
+
+      if (listen.length === 0) {
+        aktionen.setzePackliste(reise.id, null, erzeugePackliste(katalog, reise));
+        aktionen.melde(`Liste für „${reise.name}" erzeugt.`, 'ok');
+        return aktionen.gehe(`/liste/${reise.id}`);
+      }
+
+      const wem = listen.length === 1 ? 'eine Liste' : `${listen.length} Listen`;
+      aktionen.melde(`${wem} für „${reise.name}" erzeugt.`, 'ok');
+      return aktionen.gehe(`/liste/${reise.id}/${listen[0].person_id}`);
     }
 
     aktionen.melde(`„${reise.name}" gespeichert.`, 'ok');
@@ -316,6 +485,17 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
         feld('Bis', h('input', { type: 'date', value: entwurf.bis, required: true, oninput: (e) => { entwurf.bis = e.target.value; aktualisiere(); } }))
       ),
       h('p', { class: 'feld-hinweis' }, 'Reisedauer: ', tageAnzeige)
+    ),
+
+    karte(
+      'Personen',
+      h(
+        'p',
+        { class: 'feld-hinweis' },
+        'Wer mitfährt, bekommt eine eigene Liste — und damit einen eigenen Fortschritt. Das Geschlecht und die Aktivitäten hier gelten nur für diese eine Person.'
+      ),
+      personenAnzeige,
+      neuePersonFeld
     ),
 
     karte(

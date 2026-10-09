@@ -12,6 +12,7 @@
 
 import { h, karte, dateiWaehler, fmtZeitraum } from './dom.js';
 import { reisetage, tripTags, fortschritt, KATEGORIEN } from '../engine.js';
+import { findePackliste } from '../store.js';
 import { importiereKatalog } from './dateien.js';
 import { zieheKatalog } from './syncUi.js';
 
@@ -89,8 +90,29 @@ function uebersicht({ katalog, daten, aktionen }) {
 function reiseZeile(reise, daten, aktionen) {
   const tage = reisetage(reise.von, reise.bis);
   const tags = [...tripTags(reise)];
-  const liste = daten.packlisten.find((p) => p.reise_id === reise.id) ?? null;
-  const stand = liste ? fortschritt(liste.positionen) : null;
+
+  /**
+   * Die Listen dieser Reise, je Person eine (PRD §4.6). Jede verlinkt auf ihre
+   * eigene Adresse — der Fortschritt gehört zur Liste, nicht zur Reise.
+   */
+  const posten = [];
+  for (const t of reise.teilnehmer ?? []) {
+    const person = daten.personen.find((p) => p.id === t.person_id);
+    if (!person) continue;
+    posten.push({ person, liste: findePackliste(daten.packlisten, reise.id, person.id) });
+  }
+
+  // Ohne Teilnehmer die alte, eine Liste — und wenn es sie nicht gibt, auch
+  // keine Zeile: „Noch keine Liste erzeugt" steht dann unten.
+  const einzige = posten.length === 0 ? findePackliste(daten.packlisten, reise.id, null) : null;
+  const ziele = posten.length > 0 ? posten : einzige ? [{ person: null, liste: einzige }] : [];
+  const erste = ziele[0] ?? null;
+
+  const stand = (liste) => {
+    if (!liste) return null;
+    const s = fortschritt(liste.positionen);
+    return `${s.gepackt} von ${s.gesamt} gepackt${s.gesamt > 0 ? ` · ${Math.round(s.anteil * 100)} %` : ''}`;
+  };
 
   return h(
     'li',
@@ -98,7 +120,11 @@ function reiseZeile(reise, daten, aktionen) {
     h(
       'div',
       { class: 'reise-kopf' },
-      h('a', { class: 'reise-name', href: liste ? `#/liste/${reise.id}` : `#/reise/${reise.id}` }, reise.name),
+      h(
+        'a',
+        { class: 'reise-name', href: erste?.liste ? `#/liste/${reise.id}${erste.person ? `/${erste.person.id}` : ''}` : `#/reise/${reise.id}` },
+        reise.name
+      ),
       h('span', { class: 'reise-zeitraum' }, fmtZeitraum(reise.von, reise.bis, tage))
     ),
 
@@ -111,19 +137,34 @@ function reiseZeile(reise, daten, aktionen) {
       tags.length > 8 ? h('span', { class: 'klein' }, `+${tags.length - 8}`) : null
     ),
 
-    stand
+    // Eine Fortschrittszeile je Person, jede führt auf ihre eigene Liste.
+    ziele.length > 0
       ? h(
-          'p',
-          { class: 'klein' },
-          `${stand.gepackt} von ${stand.gesamt} gepackt`,
-          stand.gesamt > 0 ? ` · ${Math.round(stand.anteil * 100)} %` : ''
+          'ul',
+          { class: 'person-reihe' },
+          ...ziele.map(({ person, liste }) =>
+            h(
+              'li',
+              { class: 'person-zeile' },
+              h(
+                'a',
+                { href: `#/liste/${reise.id}${person ? `/${person.id}` : ''}` },
+                person ? person.name : 'Liste'
+              ),
+              h('span', { class: 'klein' }, liste ? stand(liste) : 'noch keine Liste')
+            )
+          )
         )
       : h('p', { class: 'klein' }, 'Noch keine Liste erzeugt'),
 
     h(
       'div',
       { class: 'knopf-reihe' },
-      h('a', { class: 'knopf knopf-haupt', href: liste ? `#/liste/${reise.id}` : `#/reise/${reise.id}` }, liste ? 'Liste öffnen' : 'Liste erzeugen'),
+      h(
+        'a',
+        { class: 'knopf knopf-haupt', href: erste?.liste ? `#/liste/${reise.id}${erste.person ? `/${erste.person.id}` : ''}` : `#/reise/${reise.id}` },
+        erste?.liste ? 'Liste öffnen' : 'Liste erzeugen'
+      ),
       h('a', { class: 'knopf knopf-leise', href: `#/reise/${reise.id}` }, 'Bearbeiten'),
       h('a', { class: 'knopf knopf-leise', href: `#/retro/${reise.id}` }, 'Retro'),
       h('button', { class: 'knopf knopf-leise', onclick: () => aktionen.dupliziereReise(reise.id) }, 'Duplizieren'),

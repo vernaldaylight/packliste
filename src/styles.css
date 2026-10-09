@@ -391,6 +391,46 @@ textarea:focus-visible,
   min-height: auto;
 }
 
+/* --- Personen (PRD §4.6) ------------------------------------------------- */
+
+/* Eine Liste von Personen: je Zeile eine, mit dem Wichtigsten daneben.
+   In der Startansicht die Fortschritte, im Reise-Formular die Einstellungen. */
+.person-reihe {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.person-zeile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  min-height: var(--ziel);
+}
+
+/* Im Reise-Formular stehen die Einstellungen einer Person untereinander. */
+.person-zeile > input[type='text'] {
+  flex: 1 1 10rem;
+}
+
+.person-zeile > a {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Der Umschalter über der Liste ist dagegen eine Reihe von Chips. */
+.person-umschalter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
 /* --- Reiseliste ---------------------------------------------------------- */
 
 .reise-liste {
@@ -486,7 +526,8 @@ textarea:focus-visible,
   min-height: var(--ziel);
   padding: 6px 0;
   border-bottom: 1px solid var(--rand);
-  flex-wrap: wrap;
+  /* Kein Umbruch: Menge und × gehören neben den Namen, nicht in eigene Zeilen.
+     Lange Namen brechen im eigenen Feld um (siehe .pos-haupt). */
 }
 
 .pos:last-child {
@@ -497,13 +538,20 @@ textarea:focus-visible,
   display: flex;
   align-items: center;
   gap: 10px;
-  flex: 1 1 10rem;
+  /* Der Name gibt nach, statt die Bedienelemente zu verdrängen. */
+  flex: 1 1 auto;
+  min-width: 0;
   min-height: var(--ziel);
+  /* Marken („von Hand", „Menge geändert") rutschen unter den Namen, statt ihn
+     auf ein Zeichen pro Zeile zusammenzudrücken. */
+  flex-wrap: wrap;
   cursor: pointer;
 }
 
 .pos-name {
   font-size: 1rem;
+  /* Sehr lange Namen brechen im Feld um, statt die Zeile zu sprengen. */
+  overflow-wrap: anywhere;
 }
 
 /* Abgehakte Positionen bleiben sichtbar, nur leiser (US-06) */
@@ -542,7 +590,10 @@ textarea:focus-visible,
   background: var(--flaeche-2);
 }
 
-.menge {
+/* `input.menge`, nicht `.menge`: die Regel für `input[type='number']` oben ist
+   genauso spezifisch und setzt `width: 100%` — hier gewinnt sie durch die
+   spätere Position, sonst füllt das Mengenfeld die ganze Zeile. */
+input.menge {
   width: 3.2rem;
   min-height: 40px;
   text-align: center;

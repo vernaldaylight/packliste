@@ -169,6 +169,78 @@
         pruefe('neuer Tag angelegt', [...app.querySelectorAll('.chip-eigen')].some((c) => c.textContent.includes('Tropen')));
         pruefe('neuer Tag wirkt in den Reise-Tags', [...app.querySelectorAll('.chip-ruhig')].some((c) => c.textContent === 'Tropen'));
 
+        /* 8b — Personen (PRD §4.6). Zwei Personen auf einer Reise, jede mit
+           ihrem Geschlecht und einer eigenen Aktivität. Geprüft wird, dass
+           daraus zwei Listen werden — und dass die Geschlechts-Items wirklich
+           nur bei der richtigen Person landen. */
+        // Das Personenfeld über seinen Platzhalter: das letzte `.freitext input`
+        // im Formular ist der freie Reise-Tag, nicht die Person.
+        const personFeld = () => app.querySelector('.freitext input[placeholder^="Neue Person"]');
+        const legePersonAn = async (name, geschlecht, aktivitaet) => {
+          const feld = personFeld();
+          feld.value = name;
+          feld.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+          await warte();
+          const zeile = [...app.querySelectorAll('.person-zeile')].find((z) => z.querySelector('input[type=text]')?.value === name);
+          if (!zeile) return null;
+          [...zeile.querySelectorAll('.chip-schalter')].find((c) => c.textContent === geschlecht)?.click();
+          await warte();
+          const neu = [...app.querySelectorAll('.person-zeile')].find((z) => z.querySelector('input[type=text]')?.value === name);
+          [...neu.querySelectorAll('.chip-schalter')].find((c) => c.textContent === aktivitaet)?.click();
+          await warte();
+          return [...app.querySelectorAll('.person-zeile')].find((z) => z.querySelector('input[type=text]')?.value === name);
+        };
+
+        pruefe('Personen-Karte ist da', text().includes('Personen') && Boolean(personFeld()));
+        pruefe('Anna angelegt', Boolean(await legePersonAn('Anna', 'weiblich', 'Fotografie')));
+        pruefe('Ben angelegt', Boolean(await legePersonAn('Ben', 'maennlich', 'Arbeit')));
+        pruefe('zwei Personen im Formular', app.querySelectorAll('.person-zeile').length === 2);
+
+        const erzeugeListen = knopfMit(app, 'Liste neu erzeugen');
+        pruefe('Knopf „Liste neu erzeugen" vorhanden', Boolean(erzeugeListen));
+        erzeugeListen?.click();
+        await warte();
+
+        pruefe('zwei Listen erzeugt', JSON.parse(localStorage.getItem('packliste.reisen')).packlisten.filter((p) => p.reise_id === 'smoke-1').length === 2);
+        pruefe('Adresse nennt die Person', location.hash.split('/').length === 4, location.hash);
+        pruefe('Personen-Umschalter sichtbar', app.querySelectorAll('.person-umschalter .chip').length === 2);
+
+        const namenAufListe = () => [...app.querySelectorAll('.pos-name')].map((e) => e.textContent);
+        const wechsle = async (name) => {
+          [...app.querySelectorAll('.person-umschalter .chip')].find((c) => c.textContent === name)?.click();
+          await warte();
+        };
+
+        // Die Adresse aus dem Erzeugen zeigt auf die erste Person — Anna.
+        pruefe('erste Liste gehört Anna', text().includes('Liste für Anna'));
+        pruefe('Anna hat Binden', namenAufListe().includes('Binden'));
+        pruefe('Anna hat Bikini', namenAufListe().includes('Bikini'));
+        pruefe('Anna hat kein Badehose', !namenAufListe().includes('Badehose'));
+        pruefe('Anna hat die Kamera', namenAufListe().includes('Kamera'));
+        pruefe('Anna hat keinen Laptop', !namenAufListe().includes('Laptop'));
+        const annaFortschritt = text().match(/(\d+) von (\d+) gepackt/)?.[2];
+
+        await wechsle('Ben');
+        pruefe('zweite Liste gehört Ben', text().includes('Liste für Ben'));
+        pruefe('Ben hat Badehose', namenAufListe().includes('Badehose'));
+        pruefe('Ben hat kein Binden', !namenAufListe().includes('Binden'));
+        pruefe('Ben hat keinen Bikini', !namenAufListe().includes('Bikini'));
+        pruefe('Ben hat den Laptop', namenAufListe().includes('Laptop'));
+        pruefe('Ben hat keine Kamera', !namenAufListe().includes('Kamera'));
+
+        // Der Fortschritt gehört zur Liste: ein Häkchen bei Ben zählt nicht bei Anna.
+        app.querySelectorAll('.haken')[0].click();
+        await warte();
+        pruefe('Bens Fortschritt zählt', text().includes('1 von'));
+        await wechsle('Anna');
+        pruefe('Annas Fortschritt bleibt bei 0', text().includes('0 von'));
+        pruefe('Annas Liste ist so lang wie vorher', text().includes(`von ${annaFortschritt} gepackt`));
+
+        // Die alte Adresse ohne Person bleibt gültig und landet auf der ersten.
+        location.hash = '#/liste/smoke-1';
+        await warte();
+        pruefe('alte Listen-Adresse leitet auf die erste Person', text().includes('Liste für Anna'));
+
         /* 9 — Katalogansicht (US-09, US-10) */
         location.hash = '#/katalog';
         await warte();

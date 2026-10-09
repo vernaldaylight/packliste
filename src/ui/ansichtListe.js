@@ -5,6 +5,12 @@
  * materialisiert, damit Nachjustieren (US-05) und Abhaken (US-06) nicht bei
  * jedem Render verloren gehen. Jede Änderung hier schreibt in die Packliste —
  * der Katalog bleibt unangetastet (US-05, letztes Kriterium).
+ *
+ * Eine Reise mit mehreren Teilnehmern hat **eine Liste je Person** (PRD §4.6).
+ * Welche gezeigt wird, steht in der Adresse: `#/liste/:reiseId/:personId`. Die
+ * alte Adresse ohne Person bleibt gültig und landet auf der ersten Person.
+ * Der Fortschritt wird dadurch von selbst getrennt — jede Liste zählt ihre
+ * eigenen Häkchen.
  */
 
 import { h, karte, meldung, fmtZeitraum } from './dom.js';
@@ -12,14 +18,14 @@ import {
   gruppiere,
   fortschritt,
   reisetage,
-  tripTags,
+  tripTagsFuerPerson,
   alsMarkdown,
   erzeugePackliste,
   neuePosition,
 } from '../engine.js';
-import { inZwischenablage, zeitstempel } from '../store.js';
+import { inZwischenablage, zeitstempel, findePackliste } from '../store.js';
 
-export function ansichtListe({ katalog, daten, aktionen, reiseId }) {
+export function ansichtListe({ katalog, daten, aktionen, reiseId, personId = null }) {
   const reise = daten.reisen.find((r) => r.id === reiseId) ?? null;
   if (!reise) {
     return h(
@@ -30,21 +36,47 @@ export function ansichtListe({ katalog, daten, aktionen, reiseId }) {
     );
   }
 
-  const liste = daten.packlisten.find((p) => p.reise_id === reiseId) ?? null;
+  /**
+   * Die Teilnehmer dieser Reise, aufgelöst gegen das Personen-Register.
+   * Teilnehmer ohne Person fallen weg — eine gelöschte Person soll hier keinen
+   * leeren Eintrag hinterlassen.
+   */
+  const teilnehmer = [];
+  for (const t of reise.teilnehmer ?? []) {
+    const person = daten.personen.find((p) => p.id === t.person_id);
+    if (person) teilnehmer.push({ t, person });
+  }
+
+  /**
+   * Welche Person ist gemeint? Ohne Angabe (oder mit einer, die nicht mehr
+   * dabei ist) die erste — so führt `#/liste/:reiseId` genau dorthin, wo man
+   * vor dem Personen-Feature gelandet wäre.
+   */
+  let aktiv = teilnehmer.find(({ person }) => person.id === personId) ?? teilnehmer[0] ?? null;
+  const personIdAktiv = aktiv?.person.id ?? null;
+
+  const liste = findePackliste(daten.packlisten, reiseId, personIdAktiv);
   if (!liste) {
     return h(
       'div',
       { class: 'stapel' },
+      personenUmschalter(),
       h('h1', {}, reise.name),
       karte(
         'Noch keine Liste',
-        h('p', {}, 'Für diese Reise wurde noch nichts erzeugt. Die Auswahl folgt aus den Tags der Reise und den Tags der Items.'),
+        h(
+          'p',
+          {},
+          aktiv
+            ? `Für ${aktiv.person.name} wurde noch nichts erzeugt. Die Auswahl folgt aus den Tags der Reise, den Aktivitäten dieser Person und ihren Items.`
+            : 'Für diese Reise wurde noch nichts erzeugt. Die Auswahl folgt aus den Tags der Reise und den Tags der Items.'
+        ),
         h(
           'button',
           {
             class: 'knopf knopf-haupt',
             onclick: () => {
-              aktionen.setzePackliste(reise.id, erzeugePackliste(katalog, reise));
+              aktionen.setzePackliste(reise.id, personIdAktiv, erzeugePackliste(katalog, reise, aktiv ?? {}));
               aktionen.melde('Liste erzeugt.', 'ok');
               aktionen.render();
             },
@@ -63,18 +95,49 @@ export function ansichtListe({ katalog, daten, aktionen, reiseId }) {
 
   /** Schreibt die geänderte Packliste weg und zeichnet den Bestand neu. */
   function sichern() {
-    aktionen.setzePackliste(reise.id, liste);
+    aktionen.setzePackliste(reise.id, personIdAktiv, liste);
     zeichneKopf();
     zeichneGruppen();
     hinzu.aktualisiereTreffer();
   }
 
+  /**
+   * Die Personen als Schalter — nur wenn es mehr als eine gibt. Bei einer
+   * einzigen Person wäre der Schalter eine Zeile ohne Wahl.
+   */
+  function personenUmschalter() {
+    if (teilnehmer.length < 2) return null;
+    return h(
+      'div',
+      { class: 'person-umschalter' },
+      ...teilnehmer.map(({ person }) =>
+        h(
+          'a',
+          {
+            class: `chip chip-schalter${person.id === personIdAktiv ? ' ist-an' : ''}`,
+            href: `#/liste/${reise.id}/${person.id}`,
+            'aria-current': person.id === personIdAktiv ? 'true' : null,
+          },
+          person.name
+        )
+      )
+    );
+  }
+
   function zeichneKopf() {
     const s = fortschritt(liste.positionen);
     kopfBereich.replaceChildren(
+      personenUmschalter(),
       h('h1', {}, reise.name),
+      aktiv
+        ? h('p', { class: 'klein' }, `Liste für ${aktiv.person.name}${geschlechtText(aktiv.person)}`)
+        : null,
       h('p', { class: 'klein' }, fmtZeitraum(reise.von, reise.bis, tage), reise.ziel ? ` · ${reise.ziel}` : ''),
-      h('p', { class: 'tag-reihe' }, ...[...tripTags(reise)].sort().map((t) => h('span', { class: 'chip chip-ruhig' }, t))),
+      h(
+        'p',
+        { class: 'tag-reihe' },
+        ...[...tripTagsFuerPerson(reise, aktiv?.t, aktiv?.person)].sort().map((t) => h('span', { class: 'chip chip-ruhig' }, t))
+      ),
       h(
         'div',
         { class: 'fortschritt' },
@@ -142,8 +205,9 @@ export function ansichtListe({ katalog, daten, aktionen, reiseId }) {
           {
             class: 'knopf knopf-gefahr',
             onclick: () => {
-              if (!confirm('Die Liste neu erzeugen? Häkchen und alle Nachjustierungen dieser Reise gehen verloren.')) return;
-              aktionen.setzePackliste(reise.id, erzeugePackliste(katalog, reise));
+              const wem = aktiv ? ` von ${aktiv.person.name}` : ' dieser Reise';
+              if (!confirm(`Die Liste${wem} neu erzeugen? Häkchen und alle Nachjustierungen gehen verloren.`)) return;
+              aktionen.setzePackliste(reise.id, personIdAktiv, erzeugePackliste(katalog, reise, aktiv ?? {}));
               aktionen.melde('Liste neu erzeugt.', 'ok');
               aktionen.render();
             },
@@ -299,17 +363,20 @@ export function ansichtListe({ katalog, daten, aktionen, reiseId }) {
   /* --- Ausgabe (US-07, F10) ---------------------------------------------- */
 
   async function kopiere(nurOffen) {
-    const md = alsMarkdown(katalog, reise, liste.positionen, nurOffen);
+    const md = alsMarkdown(katalog, reise, liste.positionen, nurOffen, aktiv?.person ?? null);
     const ok = await inZwischenablage(md);
     aktionen.melde(ok ? 'Markdown in die Zwischenablage kopiert.' : 'Kopieren ging nicht — nutze „Markdown teilen".', ok ? 'ok' : 'fehler');
     aktionen.render();
   }
 
   async function teileMarkdown() {
-    const md = alsMarkdown(katalog, reise, liste.positionen, false);
-    const sauber = reise.name.replace(/[^\wäöüßÄÖÜ -]/g, '').trim().replace(/\s+/g, '-') || 'reise';
-    const dateiname = `packliste-${sauber}-${zeitstempel()}.md`;
-    const ergebnis = await teileText(md, dateiname, reise.name, 'text/markdown');
+    const md = alsMarkdown(katalog, reise, liste.positionen, false, aktiv?.person ?? null);
+    const sauber = dateinameTeil(reise.name);
+    // Der Personenname gehört in den Dateinamen: zwei Listen derselben Reise
+    // würden sich sonst beim Ablegen überschreiben.
+    const wem = aktiv ? `-${dateinameTeil(aktiv.person.name)}` : '';
+    const dateiname = `packliste-${sauber}${wem}-${zeitstempel()}.md`;
+    const ergebnis = await teileText(md, dateiname, `${reise.name}${aktiv ? ` — ${aktiv.person.name}` : ''}`, 'text/markdown');
     if (ergebnis === 'geteilt' || ergebnis === 'heruntergeladen') {
       aktionen.melde(ergebnis === 'geteilt' ? 'Markdown geteilt.' : 'Markdown als Datei gespeichert.', 'ok');
       aktionen.render();
@@ -322,6 +389,16 @@ export function ansichtListe({ katalog, daten, aktionen, reiseId }) {
   zeichneGruppen();
 
   return h('div', { class: 'stapel' }, kopfBereich, gruppenBereich, hinzu);
+}
+
+/** Ein Dateiname-Baustein: Umlaute und Buchstaben bleiben, der Rest wird `-`. */
+function dateinameTeil(text) {
+  return (text ?? '').replace(/[^\wäöüßÄÖÜ -]/g, '').trim().replace(/\s+/g, '-') || 'reise';
+}
+
+/** „ · weiblich" — die Angabe, die über die Katalog-Auswahl entscheidet. */
+function geschlechtText(person) {
+  return person?.geschlecht ? ` · ${person.geschlecht}` : '';
 }
 
 /** Text teilen — Markdown ist kein JSON, deshalb ein eigener kleiner Weg. */

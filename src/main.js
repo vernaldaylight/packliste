@@ -10,7 +10,7 @@
  */
 
 import './styles.css';
-import { ladeKatalog, ladeDaten, speichereDaten, speicherVerfuegbar, neueId } from './store.js';
+import { ladeKatalog, ladeDaten, speichereDaten, speicherVerfuegbar, neueId, findePackliste } from './store.js';
 import { h, leere, meldung, fehlerListe } from './ui/dom.js';
 import { ansichtStart } from './ui/ansichtStart.js';
 import { ansichtReise } from './ui/ansichtReise.js';
@@ -42,8 +42,17 @@ function reiseNach(id) {
   return zustand.daten.reisen.find((r) => r.id === id) ?? null;
 }
 
-function packlisteNach(reiseId) {
-  return zustand.daten.packlisten.find((p) => p.reise_id === reiseId) ?? null;
+function personNach(id) {
+  return zustand.daten.personen.find((p) => p.id === id) ?? null;
+}
+
+/**
+ * Die Packliste zu Reise **und** Person (PRD §4.6). Weil hier nur durchgereicht
+ * wird, gilt die `?? null`-Regel für alte Listen an genau einer Stelle —
+ * `findePackliste` in store.js.
+ */
+function packlisteNach(reiseId, personId = null) {
+  return findePackliste(zustand.daten.packlisten, reiseId, personId);
 }
 
 function speichere() {
@@ -114,7 +123,9 @@ const aktionen = {
   loescheReise(id) {
     const reise = reiseNach(id);
     if (!reise) return;
-    if (!confirm(`"${reise.name}" und ihre Packliste löschen? Das lässt sich nicht rückgängig machen.`)) return;
+    const listen = zustand.daten.packlisten.filter((p) => p.reise_id === id).length;
+    const was = listen > 1 ? `${listen} Packlisten` : 'ihre Packliste';
+    if (!confirm(`"${reise.name}" und ${was} löschen? Das lässt sich nicht rückgängig machen.`)) return;
     zustand.daten.reisen = zustand.daten.reisen.filter((r) => r.id !== id);
     zustand.daten.packlisten = zustand.daten.packlisten.filter((p) => p.reise_id !== id);
     speichere();
@@ -125,24 +136,81 @@ const aktionen = {
   dupliziereReise(id) {
     const reise = reiseNach(id);
     if (!reise) return;
-    const kopie = { ...reise, id: neueId(), name: `${reise.name} (Kopie)` };
+    const kopie = {
+      ...reise,
+      id: neueId(),
+      name: `${reise.name} (Kopie)`,
+      // Ohne eigene Kopien teilten Original und Kopie dieselben Teilnehmer-
+      // Objekte — eine geänderte Aktivität änderte dann beide Reisen.
+      teilnehmer: (reise.teilnehmer ?? []).map((t) => ({ ...t, aktivitaeten: [...(t.aktivitaeten ?? [])] })),
+    };
     zustand.daten.reisen.unshift(kopie);
     speichere(); // die Packliste wird bewusst nicht mitkopiert — sie ist eine Momentaufnahme
     aktionen.melde(`"${kopie.name}" angelegt.`, 'ok');
     aktionen.gehe(`/reise/${kopie.id}`);
   },
 
+  /* Personen (PRD §4.6) */
+
+  /**
+   * Das globale Register. Eine Person gehört keinem einzelnen Reise-Eintrag,
+   * sondern dem Bestand — sonst müsste man sie auf jeder Reise neu anlegen.
+   */
+  legePersonAn(person) {
+    const neu = { id: neueId(), name: '', geschlecht: '', ...person };
+    zustand.daten.personen.push(neu);
+    speichere();
+    return neu;
+  },
+
+  aktualisierePerson(id, aenderungen) {
+    const i = zustand.daten.personen.findIndex((p) => p.id === id);
+    if (i === -1) return null;
+    zustand.daten.personen[i] = { ...zustand.daten.personen[i], ...aenderungen };
+    speichere();
+    return zustand.daten.personen[i];
+  },
+
+  /**
+   * Löscht eine Person aus dem Register **und** aus allen Reisen.
+   *
+   * Die Packlisten bleiben stehen: sie sind eine Momentaufnahme (PRD §4.4), und
+   * wer gerade packt, soll die Liste nicht unter den Händen verlieren. Erreichbar
+   * bleibt sie über ihre Person-Id, auch wenn es die Person nicht mehr gibt.
+   */
+  loeschePerson(id) {
+    const person = personNach(id);
+    if (!person) return;
+    const betroffen = zustand.daten.reisen.filter((r) => (r.teilnehmer ?? []).some((t) => t.person_id === id));
+    const frage = betroffen.length
+      ? `"${person.name}" löschen? Sie fällt aus ${betroffen.length} Reise(n); die dort schon erzeugten Listen bleiben erhalten.`
+      : `"${person.name}" löschen?`;
+    if (!confirm(frage)) return;
+
+    zustand.daten.personen = zustand.daten.personen.filter((p) => p.id !== id);
+    for (const r of zustand.daten.reisen) {
+      if (Array.isArray(r.teilnehmer)) r.teilnehmer = r.teilnehmer.filter((t) => t.person_id !== id);
+    }
+    speichere();
+    aktionen.melde(`"${person.name}" gelöscht.`, 'info');
+  },
+
   /* Packlisten */
 
-  setzePackliste(reiseId, packliste) {
-    const i = zustand.daten.packlisten.findIndex((p) => p.reise_id === reiseId);
-    if (i === -1) zustand.daten.packlisten.push(packliste);
-    else zustand.daten.packlisten[i] = packliste;
+  setzePackliste(reiseId, personId, packliste) {
+    const gesetzt = { ...packliste, reise_id: reiseId, person_id: personId ?? null };
+    const i = zustand.daten.packlisten.findIndex(
+      (p) => (p.reise_id === reiseId) && ((p.person_id ?? null) === (personId ?? null))
+    );
+    if (i === -1) zustand.daten.packlisten.push(gesetzt);
+    else zustand.daten.packlisten[i] = gesetzt;
     speichere();
   },
 
-  loeschePackliste(reiseId) {
-    zustand.daten.packlisten = zustand.daten.packlisten.filter((p) => p.reise_id !== reiseId);
+  loeschePackliste(reiseId, personId = null) {
+    zustand.daten.packlisten = zustand.daten.packlisten.filter(
+      (p) => !((p.reise_id === reiseId) && ((p.person_id ?? null) === (personId ?? null)))
+    );
     speichere();
   },
 
@@ -181,7 +249,9 @@ function route() {
     case 'reise':
       return ansichtReise(ctx({ reiseId: teile[1] === 'neu' ? null : teile[1] }));
     case 'liste':
-      return ansichtListe(ctx({ reiseId: teile[1] }));
+      // `#/liste/:reiseId` bleibt gültig — die Ansicht leitet auf die erste
+      // Person um, wenn es mehrere gibt (PRD §4.6).
+      return ansichtListe(ctx({ reiseId: teile[1], personId: teile[2] ?? null }));
     case 'retro':
       return ansichtRetro(ctx({ reiseId: teile[1] }));
     case 'katalog':
