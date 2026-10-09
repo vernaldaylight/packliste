@@ -183,6 +183,14 @@ Tag-Ableitung, Katalogansicht samt Sync-Bedienung, Retro, und zuletzt den leeren
 Zustand ohne Katalog. Er prüft genau die Dinge, die ein Node-Test nicht sieht — unter
 anderem, dass das Token nirgends im DOM landet.
 
+Zwei Fälle stellt er mit Attrappen nach, weil sie sonst nur mit echtem Netz oder
+echtem vollem Speicher zu treffen wären: ein **gestubbter `fetch`** liefert einen
+gültigen Katalog, während `Storage.prototype.setItem` für `packliste.katalog` wirft —
+so läuft der Quota-Zweig von `zieheKatalog` wirklich durch, und der Katalog darf
+nicht übernommen werden. Achtung beim Nachbauen: `localStorage.setItem = …` verdeckt
+die Methode **nicht**, die `Storage`-Schnittstelle legt damit einen Schlüssel
+„setItem" an; der Stub gehört auf den Prototyp.
+
 ```bash
 npm run dev   # in einem zweiten Terminal laufen lassen
 

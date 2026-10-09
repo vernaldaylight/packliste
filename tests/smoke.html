@@ -355,6 +355,50 @@
         pruefe('Token wird als hinterlegt gemeldet', text().includes('Token hinterlegt'));
         pruefe('Repo wird angezeigt', app.querySelector('input[type=text]')?.value === 'owner/packliste-daten');
 
+        /* 9b-2 — Der Quota-Fall (C4). Der echte Sync läuft gegen GitHub und wird
+           hier deshalb gestubbt: GitHub liefert einen gültigen Katalog, aber der
+           Browser kann ihn nicht ablegen. Der Katalog darf dann NICHT übernommen
+           werden — sonst meldete die App Erfolg über etwas, das nichts gespeichert
+           hat, und der nächste Start stünde wieder ohne Katalog da.
+
+           Der Stub muss VOR dem ersten Sync-Aufruf stehen: `erstelleSync` backt
+           `globalThis.fetch` beim Bauen des Netzrandes ein, und `netz()` legt ihn
+           beim ersten Mal an. Bis hierher lief kein Sync (der Klick ohne Token
+           oben kommt aus `bereit` zurück, bevor `netz()` gerufen wird). */
+        const echterFetch = globalThis.fetch;
+        const echterSetItem = Storage.prototype.setItem;
+        const { kodiereBase64 } = await import('/src/sync.js');
+        let abrufe = 0;
+        globalThis.fetch = async () => {
+          abrufe++;
+          return {
+            status: 200,
+            text: async () =>
+              JSON.stringify({ content: kodiereBase64(JSON.stringify(katalog)), sha: 'stub-sha' }),
+          };
+        };
+        // Auf dem Prototyp, nicht auf `localStorage` selbst: die Storage-
+        // Schnittstelle hat einen Named-Property-Setter, `localStorage.setItem =
+        // …` legte dort einen Schlüssel „setItem" an statt die Methode zu
+        // verdecken. Nur der Katalog scheitert — das Backup daneben soll
+        // durchgehen, sonst prüfte der Test den falschen Zweig.
+        Storage.prototype.setItem = function (k, v) {
+          if (k === 'packliste.katalog') throw new DOMException('voll', 'QuotaExceededError');
+          return echterSetItem.call(this, k, v);
+        };
+
+        knopfMit(app, 'Aus GitHub holen')?.click();
+        await warteAuf(() => text().includes('konnte nicht gespeichert werden'));
+
+        pruefe('der gestubbte Sync wurde wirklich aufgerufen', abrufe === 1, `${abrufe} Abrufe`);
+        pruefe('voller Speicher wird beim Katalog gemeldet', text().includes('Der Katalog konnte nicht gespeichert werden'));
+        pruefe('und nicht als Erfolg ausgegeben', !text().includes('Katalog geholt:'));
+        pruefe('der Katalog im Speicher ist unverändert', JSON.parse(localStorage.getItem('packliste.katalog')).items.length === katalog.items.length);
+        pruefe('die App läuft danach weiter', Boolean(knopfMit(app, 'Hochschieben')));
+
+        globalThis.fetch = echterFetch;
+        Storage.prototype.setItem = echterSetItem;
+
         /* 9c — Der Ladezustand. Ein Sync sperrt die Knöpfe, solange er läuft.
            Das Repo ist absichtlich falsch geformt: `istRepoName` lehnt es ab,
            BEVOR irgendetwas rausgeht — der Test macht also keinen Netzaufruf.
