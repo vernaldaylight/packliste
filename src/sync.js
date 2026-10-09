@@ -305,7 +305,9 @@ export async function schiebeReisen({ sync, token, repo, pfad = 'reisen.json', d
     return { ok: false, fehler: 'Der Stand auf diesem Gerät ist unbrauchbar — es wurde nichts hochgeschoben.', fehlerListe: geprueft.fehler };
   }
 
-  const sauber = geprueft.daten;
-  const inhalt = `${JSON.stringify({ version: sauber.version, reisen: sauber.reisen, packlisten: sauber.packlisten }, null, 2)}\n`;
+  // `sauber` ist bereits die vollständige Form (store.js, normalisiereDaten) —
+  // hier keine Felder aufzählen: eine Liste an dieser Stelle hat `personen`
+  // zuletzt vergessen, und zwar zwischen Prüfung und Schreiben.
+  const inhalt = `${JSON.stringify(geprueft.daten, null, 2)}\n`;
   return sync.lege({ token, repo, pfad, inhalt, sha, nachricht: nachricht ?? 'packliste: Reisen sichern' });
 }

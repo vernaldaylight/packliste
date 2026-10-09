@@ -47,6 +47,8 @@ const {
   leereDaten,
   fuegeReisenZusammen,
   neueId,
+  listenSchluessel,
+  findePackliste,
   SCHLUESSEL,
 } = await import('../src/store.js');
 
@@ -220,7 +222,7 @@ test('echter Katalog: elf Kategorien und ein gepflegtes Tag-Vokabular (PRD Anhan
 
 test('leerer Zustand: ohne gespeicherte Daten kommt eine leere Struktur', () => {
   const d = ladeDaten();
-  assert.deepEqual(d, { version: 1, reisen: [], packlisten: [] });
+  assert.deepEqual(d, { version: 2, personen: [], reisen: [], packlisten: [] });
 });
 
 test('Reisen überleben Speichern und Laden', () => {
@@ -255,7 +257,7 @@ test('ein gesperrter Speicher wirft mit einem verständlichen Satz', () => {
 
 test('kaputte gespeicherte Daten werden als leerer Bestand behandelt', () => {
   localStorage.setItem(SCHLUESSEL.daten, 'nicht mal json');
-  assert.deepEqual(ladeDaten(), { version: 1, reisen: [], packlisten: [] });
+  assert.deepEqual(ladeDaten(), { version: 2, personen: [], reisen: [], packlisten: [] });
 });
 
 /* --- Zusammenführen (US-10 und Sync, PRD §4.5) ----------------------------- */
@@ -275,7 +277,7 @@ test('fuegeReisenZusammen: gleiche id ersetzt, neue kommen dazu', () => {
   assert.equal(dazu, 1, 'nur b ist wirklich neu');
   assert.equal(daten.reisen.length, 2);
   assert.equal(daten.reisen.find((r) => r.id === 'a').name, 'Neu');
-  assert.equal(daten.version, 1);
+  assert.equal(daten.version, 2, 'das Ergebnis trägt den aktuellen Stand, die Eingaben dürfen alt sein');
 });
 
 test('fuegeReisenZusammen: eine fremde Reise ohne Packliste lässt den lokalen Abhak-Stand stehen', () => {
@@ -315,6 +317,163 @@ test('fuegeReisenZusammen verträgt einen leeren Bestand in beide Richtungen', (
   assert.equal(fuegeReisenZusammen(leer, voll).daten.reisen.length, 1);
   assert.equal(fuegeReisenZusammen(voll, leer).daten.reisen.length, 1, 'nichts zu mischen heißt: nichts verlieren');
   assert.equal(fuegeReisenZusammen(null, voll).daten.reisen.length, 1, 'auch ohne Bestand darf es nicht werfen');
+});
+
+/* --- Personen (PRD §4.6) --------------------------------------------------- */
+
+/*
+ * Der teure Fehlerfall steht im ersten Test: eine Reise hat zwei Listen, und ein
+ * Merge über `reise_id` allein hielte nur eine davon. Der zweite ist der
+ * Altbestand — er darf durch das neue Feld nicht unlesbar werden.
+ */
+
+test('Personen überleben Speichern und Laden', () => {
+  const daten = leereDaten();
+  daten.personen.push({ id: 'p1', name: 'Anna', geschlecht: 'weiblich' });
+  speichereDaten(daten);
+
+  const wieder = ladeDaten();
+  assert.deepEqual(wieder.personen, [{ id: 'p1', name: 'Anna', geschlecht: 'weiblich' }]);
+});
+
+test('ein Stand ohne personen bleibt gültig und wird aufgefüllt', () => {
+  // So sieht der Bestand auf einem Gerät aus, das die alte App-Version hat.
+  localStorage.setItem(
+    SCHLUESSEL.daten,
+    JSON.stringify({
+      version: 1,
+      reisen: [{ id: 'r1', name: 'Tauchurlaub', von: '2026-08-01', bis: '2026-08-10' }],
+      packlisten: [{ reise_id: 'r1', erzeugt_am: '2026-08-01T00:00:00.000Z', positionen: [] }],
+    })
+  );
+
+  const d = ladeDaten();
+  assert.deepEqual(d.personen, []);
+  assert.deepEqual(d.reisen[0].teilnehmer, []);
+  assert.equal(d.reisen[0].name, 'Tauchurlaub', 'die Reise bleibt, wie sie war');
+  assert.equal(d.packlisten[0].person_id, undefined, 'einer alten Liste wird kein person_id angedichtet');
+});
+
+test('findePackliste unterscheidet die Personen derselben Reise', () => {
+  const listeAnna = { reise_id: 'r1', person_id: 'p1', positionen: [] };
+  const listeBen = { reise_id: 'r1', person_id: 'p2', positionen: [] };
+  const alt = { reise_id: 'r1', positionen: [] }; // ohne person_id
+
+  const alle = [alt, listeAnna, listeBen];
+  assert.equal(findePackliste(alle, 'r1', 'p1'), listeAnna);
+  assert.equal(findePackliste(alle, 'r1', 'p2'), listeBen);
+  assert.equal(findePackliste(alle, 'r1', null), alt);
+  assert.equal(findePackliste(alle, 'r1', 'p-geloescht'), null);
+  assert.equal(findePackliste([], 'r1', null), null);
+});
+
+test('listenSchluessel hält null und "" auseinander', () => {
+  assert.equal(listenSchluessel('r1', null), listenSchluessel('r1', undefined));
+  assert.notEqual(listenSchluessel('r1', null), listenSchluessel('r1', 'p1'));
+  assert.notEqual(listenSchluessel('r1', 'p1'), listenSchluessel('r1', 'p2'));
+  // Zwei Reisen mit gleicher Person bleiben zwei Listen.
+  assert.notEqual(listenSchluessel('r1', 'p1'), listenSchluessel('r2', 'p1'));
+});
+
+test('fuegeReisenZusammen: zwei Listen derselben Reise bleiben beide erhalten', () => {
+  const bestand = { version: 2, personen: [], reisen: [], packlisten: [] };
+  const neu = {
+    version: 2,
+    personen: [
+      { id: 'p1', name: 'Anna' },
+      { id: 'p2', name: 'Ben' },
+    ],
+    reisen: [{ id: 'r1', name: 'Tauchurlaub', teilnehmer: [{ person_id: 'p1' }, { person_id: 'p2' }] }],
+    packlisten: [
+      { reise_id: 'r1', person_id: 'p1', positionen: [{ item_id: 'bikini', gepackt: true }] },
+      { reise_id: 'r1', person_id: 'p2', positionen: [{ item_id: 'badehose', gepackt: false }] },
+    ],
+  };
+
+  const { daten } = fuegeReisenZusammen(bestand, neu);
+  assert.equal(daten.packlisten.length, 2, 'die zweite Person darf die erste nicht überschreiben');
+  assert.equal(findePackliste(daten.packlisten, 'r1', 'p1').positionen[0].gepackt, true);
+  assert.equal(findePackliste(daten.packlisten, 'r1', 'p2').positionen[0].item_id, 'badehose');
+  assert.deepEqual(daten.personen.map((p) => p.id), ['p1', 'p2']);
+});
+
+test('fuegeReisenZusammen: eine Person ersetzt nur ihre eigene Liste', () => {
+  const bestand = {
+    version: 2,
+    personen: [{ id: 'p1', name: 'Anna' }],
+    reisen: [{ id: 'r1', name: 'Tauchurlaub' }],
+    packlisten: [
+      { reise_id: 'r1', person_id: 'p1', positionen: [{ item_id: 'x', gepackt: false }] },
+      { reise_id: 'r1', person_id: 'p2', positionen: [{ item_id: 'y', gepackt: true }] },
+    ],
+  };
+  const neu = {
+    version: 2,
+    personen: [{ id: 'p2', name: 'Benjamin' }],
+    reisen: [{ id: 'r1', name: 'Tauchurlaub' }],
+    packlisten: [{ reise_id: 'r1', person_id: 'p1', positionen: [{ item_id: 'x', gepackt: true }] }],
+  };
+
+  const { daten } = fuegeReisenZusammen(bestand, neu);
+  assert.equal(findePackliste(daten.packlisten, 'r1', 'p1').positionen[0].gepackt, true, 'p1 wird ersetzt');
+  assert.equal(findePackliste(daten.packlisten, 'r1', 'p2').positionen[0].gepackt, true, 'p2 bleibt unberührt');
+  assert.equal(daten.personen.find((p) => p.id === 'p2').name, 'Benjamin', 'gleiche id ersetzt die Person');
+  assert.equal(daten.personen.find((p) => p.id === 'p1').name, 'Anna');
+});
+
+test('fuegeReisenZusammen: eine alte Liste ohne person_id bleibt ihre eigene', () => {
+  // Kein `person_id` heißt `null` — nicht „passt auf alle". Sonst überschriebe
+  // die Altliste beim Holen die Liste der ersten Person.
+  const bestand = {
+    version: 2,
+    reisen: [{ id: 'r1' }],
+    packlisten: [{ reise_id: 'r1', person_id: 'p1', positionen: [{ item_id: 'a' }] }],
+  };
+  const neu = {
+    version: 2,
+    reisen: [{ id: 'r1' }],
+    packlisten: [{ reise_id: 'r1', positionen: [{ item_id: 'alt' }] }],
+  };
+
+  const { daten } = fuegeReisenZusammen(bestand, neu);
+  assert.equal(daten.packlisten.length, 2);
+  assert.equal(findePackliste(daten.packlisten, 'r1', 'p1').positionen[0].item_id, 'a');
+  assert.equal(findePackliste(daten.packlisten, 'r1', null).positionen[0].item_id, 'alt');
+});
+
+test('validiereDaten nimmt personen, teilnehmer und person_id an', () => {
+  const datei = {
+    version: 2,
+    personen: [{ id: 'p1', name: 'Anna', geschlecht: 'weiblich' }],
+    reisen: [{ id: 'r1', name: 'Tauchurlaub', teilnehmer: [{ person_id: 'p1', aktivitaeten: ['Fotografie'] }] }],
+    packlisten: [
+      { reise_id: 'r1', person_id: 'p1', positionen: [] },
+      { reise_id: 'r1', person_id: null, positionen: [] },
+    ],
+  };
+  const p = validiereDaten(datei);
+  assert.ok(p.ok);
+  assert.deepEqual(p.daten.personen, datei.personen);
+  assert.deepEqual(p.daten.reisen[0].teilnehmer, datei.reisen[0].teilnehmer);
+});
+
+test('validiereDaten lehnt kaputte Personen und Teilnehmer ab', () => {
+  const reise = { id: 'r1', name: 'Tauchurlaub' };
+  const faelle = [
+    [{ reisen: [reise], personen: 'keine Liste' }, /"personen" ist keine Liste/],
+    [{ reisen: [reise], personen: [{ name: 'ohne id' }] }, /Person #1: id fehlt/],
+    [{ reisen: [reise], personen: [{ id: 'p1' }] }, /Person #1: name fehlt/],
+    [{ reisen: [{ ...reise, teilnehmer: 'keine Liste' }] }, /"teilnehmer" ist keine Liste/],
+    [{ reisen: [{ ...reise, teilnehmer: [{ aktivitaeten: [] }] }] }, /Teilnehmer #1: person_id fehlt/],
+    [{ reisen: [reise], packlisten: [{ person_id: 'p1' }] }, /Packliste #1: reise_id fehlt/],
+    [{ reisen: [reise], packlisten: [{ reise_id: 'r1', person_id: 7 }] }, /person_id ist weder Text noch null/],
+  ];
+
+  for (const [datei, muster] of faelle) {
+    const p = validiereDaten(datei);
+    assert.equal(p.ok, false, `hätte abgelehnt werden müssen: ${JSON.stringify(datei)}`);
+    assert.match(p.fehler.join(' '), muster);
+  }
 });
 
 /* --- Reise-Datei prüfen (US-10) -------------------------------------------- */

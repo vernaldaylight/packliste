@@ -26,7 +26,18 @@ export const SCHLUESSEL = {
   syncStand: 'packliste.sync.stand',
 };
 
-const DATEN_VERSION = 1;
+/**
+ * Stand des Reise-Datensatzes (PRD §4.5).
+ *
+ * 1 -> 2 mit dem Personen-Feature (PRD §4.6): `personen` kam dazu, eine
+ * Packliste hängt jetzt an `(reise_id, person_id)` statt nur an der Reise.
+ *
+ * Ehrlich gesagt: verzweigt wird über diese Zahl nirgends. Der Bump ist ein
+ * Signal an den Menschen, kein Schutz — die eigentliche Arbeit macht
+ * `normalisiereDaten`, das fehlende Felder unabhängig von der Version auffüllt.
+ * Eine Migrationsmaschinerie gibt es bewusst nicht: alles ist additiv.
+ */
+const DATEN_VERSION = 2;
 
 /* --- localStorage, der auch dann nicht wirft, wenn er gesperrt ist --------- */
 
@@ -204,8 +215,51 @@ export function katalogBackupVorhanden() {
 
 /* --- Reisen und Packlisten ------------------------------------------------- */
 
+/**
+ * Auffüllen, was fehlt — die eine Stelle, die weiß, wie ein Reise-Datensatz
+ * aussieht (PRD §4.6).
+ *
+ * Jeder Weg, der Reisen von außen hereinlässt, endet hier: der localStorage,
+ * die Datei (US-10) und der Sync (PRD §4.5). Ohne diese gemeinsame Stelle
+ * müsste jede Naht dieselben Felder kennen, und `personen` verschwände still
+ * auf dem Weg zwischen Prüfung und Schreiben.
+ *
+ * Alte Bestände sind der Normalfall, nicht die Ausnahme: sie haben kein
+ * `personen` und keine `teilnehmer`. Sie bleiben gültig. Einer alten Packliste
+ * wird **kein** `person_id` angedichtet — das änderte ihre Identität; Leser
+ * nehmen `p.person_id ?? null`.
+ */
+export function normalisiereDaten(roh) {
+  return {
+    version: roh?.version ?? DATEN_VERSION,
+    personen: Array.isArray(roh?.personen) ? roh.personen : [],
+    reisen: (Array.isArray(roh?.reisen) ? roh.reisen : []).map((r) => ({
+      ...r,
+      teilnehmer: Array.isArray(r?.teilnehmer) ? r.teilnehmer : [],
+    })),
+    packlisten: Array.isArray(roh?.packlisten) ? roh.packlisten : [],
+  };
+}
+
 export function leereDaten() {
-  return { version: DATEN_VERSION, reisen: [], packlisten: [] };
+  return { version: DATEN_VERSION, personen: [], reisen: [], packlisten: [] };
+}
+
+/**
+ * Der Schlüssel einer Packliste (PRD §4.6): das **Paar** aus Reise und Person.
+ *
+ * Eine Reise mit zwei Personen hat zwei Listen — über `reise_id` allein wäre die
+ * zweite die erste. `null` (Altbestand, Ein-Personen-Liste) wird zu `''`, damit
+ * das Paar ein einfacher String bleibt.
+ */
+export function listenSchluessel(reiseId, personId) {
+  return `${reiseId}::${personId ?? ''}`;
+}
+
+/** Die Packliste zu genau dieser Reise und dieser Person — oder `null`. */
+export function findePackliste(packlisten, reiseId, personId) {
+  const gesucht = listenSchluessel(reiseId, personId);
+  return (packlisten ?? []).find((p) => listenSchluessel(p.reise_id, p.person_id) === gesucht) ?? null;
 }
 
 export function ladeDaten() {
@@ -214,11 +268,7 @@ export function ladeDaten() {
   try {
     const d = JSON.parse(roh);
     if (!d || typeof d !== 'object') return leereDaten();
-    return {
-      version: d.version ?? DATEN_VERSION,
-      reisen: Array.isArray(d.reisen) ? d.reisen : [],
-      packlisten: Array.isArray(d.packlisten) ? d.packlisten : [],
-    };
+    return normalisiereDaten(d);
   } catch {
     return leereDaten();
   }
@@ -251,23 +301,39 @@ export function validiereDaten(rohdaten) {
   if (rohdaten.packlisten !== undefined && !Array.isArray(rohdaten.packlisten)) {
     fehler.push('Feld "packlisten" ist keine Liste.');
   }
+  if (rohdaten.personen !== undefined && !Array.isArray(rohdaten.personen)) {
+    fehler.push('Feld "personen" ist keine Liste.');
+  }
   if (fehler.length) return { ok: false, fehler, daten: null };
 
   for (const [i, r] of rohdaten.reisen.entries()) {
     if (!r?.id) fehler.push(`Reise #${i + 1}: id fehlt.`);
     if (!r?.name) fehler.push(`Reise #${i + 1}: name fehlt.`);
+    if (r?.teilnehmer !== undefined && !Array.isArray(r.teilnehmer)) {
+      fehler.push(`Reise #${i + 1} (${r?.name ?? '?'}): Feld "teilnehmer" ist keine Liste.`);
+    }
+    for (const [j, t] of (Array.isArray(r?.teilnehmer) ? r.teilnehmer : []).entries()) {
+      if (!t?.person_id) fehler.push(`Reise #${i + 1} (${r?.name ?? '?'}), Teilnehmer #${j + 1}: person_id fehlt.`);
+    }
+  }
+
+  for (const [i, p] of (rohdaten.personen ?? []).entries()) {
+    if (!p?.id) fehler.push(`Person #${i + 1}: id fehlt.`);
+    if (!p?.name) fehler.push(`Person #${i + 1}: name fehlt.`);
+  }
+
+  for (const [i, p] of (rohdaten.packlisten ?? []).entries()) {
+    if (!p?.reise_id) fehler.push(`Packliste #${i + 1}: reise_id fehlt.`);
+    if (p?.person_id !== undefined && p.person_id !== null && typeof p.person_id !== 'string') {
+      fehler.push(`Packliste #${i + 1}: person_id ist weder Text noch null.`);
+    }
   }
   if (fehler.length) return { ok: false, fehler, daten: null };
 
-  return {
-    ok: true,
-    fehler: [],
-    daten: {
-      version: rohdaten.version ?? DATEN_VERSION,
-      reisen: rohdaten.reisen,
-      packlisten: rohdaten.packlisten ?? [],
-    },
-  };
+  // Geprüft wird die Rohform, zurückgegeben die vollständige: so bekommt jeder
+  // Aufrufer `personen` und `teilnehmer` auch dann, wenn die Datei sie nicht
+  // hatte — und der nächste Schreibvorgang verliert sie nicht.
+  return { ok: true, fehler: [], daten: normalisiereDaten(rohdaten) };
 }
 
 /**
@@ -280,9 +346,16 @@ export function validiereDaten(rohdaten) {
  * derselben Reise feldweise zu mischen wären. Ob drüben inzwischen etwas anderes
  * liegt, erkennt der Sync über die `sha` der Contents-API, nicht über die Daten.
  *
- * Eine Packliste gehört zu genau einer Reise und wird als Ganzes ersetzt, nicht
- * positionenweise gemischt — sonst verlöre man beim Holen den Abhak-Stand.
- * Kommt eine Reise ohne Packliste herein, bleibt die hiesige erhalten.
+ * Eine Packliste gehört zu genau einer Reise **und einer Person** und wird als
+ * Ganzes ersetzt, nicht positionenweise gemischt — sonst verlöre man beim Holen
+ * den Abhak-Stand. Kommt eine Reise ohne Packliste herein, bleibt die hiesige
+ * erhalten.
+ *
+ * Der Schlüssel ist das Paar aus `reise_id` und `person_id`, nicht die Reise
+ * allein: mit `reise_id` allein überschriebe die zweite Person still die Liste
+ * der ersten. Beide Seiten gehen deshalb durch `listenSchluessel`.
+ *
+ * Personen sind ein Register: gleiche `id` wird ersetzt, sonst angehängt.
  *
  * @returns {{daten: object, dazu: number}} `dazu` = Zahl der neuen Reisen
  */
@@ -295,15 +368,23 @@ export function fuegeReisenZusammen(bestand, neu) {
     nachId.set(r.id, r);
   }
 
-  const ersetzteListeIds = new Set((neu?.packlisten ?? []).map((p) => p.reise_id));
-  const behalteneListen = (bestand?.packlisten ?? []).filter((p) => !ersetzteListeIds.has(p.reise_id));
+  const personenNachId = new Map((bestand?.personen ?? []).map((p) => [p.id, p]));
+  for (const p of neu?.personen ?? []) personenNachId.set(p.id, p);
+
+  const ersetzteSchluessel = new Set(
+    (neu?.packlisten ?? []).map((p) => listenSchluessel(p.reise_id, p.person_id))
+  );
+  const behalteneListen = (bestand?.packlisten ?? []).filter(
+    (p) => !ersetzteSchluessel.has(listenSchluessel(p.reise_id, p.person_id))
+  );
 
   return {
-    daten: {
+    daten: normalisiereDaten({
       version: DATEN_VERSION,
+      personen: [...personenNachId.values()],
       reisen: [...nachId.values()],
       packlisten: [...behalteneListen, ...(neu?.packlisten ?? [])],
-    },
+    }),
     dazu,
   };
 }

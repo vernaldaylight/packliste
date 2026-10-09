@@ -258,7 +258,40 @@ test('schiebeReisen schreibt einen geprüften, lesbaren Stand', async () => {
   const geschrieben = dekodiereBase64(koerper.content);
   assert.match(geschrieben, /Tauchurlaub/);
   assert.match(geschrieben, /\n$/, 'Datei endet mit Zeilenumbruch — lesbare Diffs');
-  assert.deepEqual(JSON.parse(geschrieben).reisen, daten.reisen);
+
+  const drueben = JSON.parse(geschrieben);
+  assert.equal(drueben.reisen[0].id, 'r1');
+  assert.deepEqual(drueben.packlisten, []);
+  assert.deepEqual(drueben.personen, [], 'auch ein alter Stand geht als vollständiger hinaus');
+  assert.deepEqual(drueben.reisen[0].teilnehmer, []);
+});
+
+test('schiebeReisen schreibt Personen und beide Listen zweier Personen mit', async () => {
+  // Der teure Fall: ginge `personen` zwischen Prüfung und Schreiben verloren,
+  // stünden die Listen drüben ohne ihre Personen da — und beim nächsten Holen
+  // wären die Teilnehmer weg.
+  const { fetchFn, aufrufe } = baueFetch({ status: 201, koerper: JSON.stringify({ content: { sha: 's' } }) });
+  const sync = erstelleSync({ fetchFn });
+
+  const daten = {
+    version: 2,
+    personen: [
+      { id: 'p1', name: 'Anna', geschlecht: 'weiblich' },
+      { id: 'p2', name: 'Ben', geschlecht: 'maennlich' },
+    ],
+    reisen: [{ id: 'r1', name: 'Tauchurlaub', teilnehmer: [{ person_id: 'p1' }, { person_id: 'p2' }] }],
+    packlisten: [
+      { reise_id: 'r1', person_id: 'p1', positionen: [] },
+      { reise_id: 'r1', person_id: 'p2', positionen: [] },
+    ],
+  };
+  const r = await schiebeReisen({ sync, token: TOKEN, repo: 'owner/name', daten, sha: 'alt' });
+  assert.ok(r.ok);
+
+  const drueben = JSON.parse(dekodiereBase64(JSON.parse(aufrufe[0].body).content));
+  assert.deepEqual(drueben.personen, daten.personen);
+  assert.deepEqual(drueben.reisen[0].teilnehmer, daten.reisen[0].teilnehmer);
+  assert.deepEqual(drueben.packlisten.map((p) => p.person_id), ['p1', 'p2']);
 });
 
 test('schiebeReisen schiebt einen unbrauchbaren Stand gar nicht erst hoch', async () => {

@@ -62,7 +62,9 @@ export async function importiereReisen(datei, aktionen, ersetzen) {
   }
 
   if (ersetzen) {
-    aktionen.setzeDaten({ version: 1, reisen: geprueft.daten.reisen, packlisten: geprueft.daten.packlisten });
+    // `geprueft.daten` ist die vollständige Form (store.js, normalisiereDaten) —
+    // hier keine Felder nachbauen, sonst fiele `personen` beim Ersetzen weg.
+    aktionen.setzeDaten(geprueft.daten);
     aktionen.melde(`${neu} Reisen wiederhergestellt.`, 'ok');
   } else {
     // Zusammenführen über die `id` — dieselbe Regel wie beim Sync (PRD §3.4,
