@@ -1,6 +1,6 @@
 # Packliste — Product Requirements Document
 
-**Version**: 1.12
+**Version**: 1.13
 **Datum**: 2026-10-09
 **Autor**: Sarah
 **Status**: Abgestimmt — bereit für die Umsetzung. Technische Architektur entschieden (§3.6). Der Katalog-Editor ist aus dem MVP in die erste Überarbeitung verschoben (FF-16).
@@ -248,8 +248,8 @@ Reise {
   bis: date                       // -> reisetage
   saison: string[]                // ["Winter", "Regen"] — Mehrfachauswahl (1.11)
   aktivitaeten: string[]          // ["Tauchen", "Schnorcheln"]
-  verkehrsmittel: "Flugzeug" | "Auto" | "Zug"
-  unterkunft: "Camping" | "Ferienwohnung" | "Hotel" | "Hostel" | "Freunde"
+  verkehrsmittel: "Flugzeug" | ""  // "" = nicht gewählt
+  unterkunft: "Camping" | "Ferienwohnung" | "Hotel" | "Hostel" | ""
   zusatz_tags: string[]           // über Schalter (Reiseapotheke); der Rest ist Altbestand (1.11)
   teilnehmer: Teilnehmer[]        // leer = Reise ohne Personen (§4.6)
 }
@@ -264,7 +264,9 @@ Teilnehmer {
 
 Eine Reise ohne `teilnehmer` ist der Altbestand und verhält sich wie vor dem Personen-Feature (§4.6).
 
-**Verkehrsmittel und Unterkunft sind keine Sonderfälle, sondern Tag-Quellen.** Es gibt kein Regelwerk und keine Warnungen: `Flugzeug` ist ein Tag wie jeder andere, und Items wie Nackenkissen, Wollsocken oder der 1-L-Zip-Beutel tragen ihn. Wer mit dem Auto fährt, bekommt diese Items einfach nicht — und dafür alle Items mit Tag `Auto`. Dasselbe gilt für die Unterkunft: Wer im Hotel schläft, braucht kein Handtuch und keinen Föhn.
+`verkehrsmittel` und `unterkunft` sind Einfachauswahlen — `""` heißt „nicht gewählt". `Auto`, `Zug` und `Freunde` standen dort bis 1.10 und sind in 1.13 entfallen: kein Item trug sie (Anhang B.2).
+
+**Verkehrsmittel und Unterkunft sind keine Sonderfälle, sondern Tag-Quellen.** Es gibt kein Regelwerk und keine Warnungen: `Flugzeug` ist ein Tag wie jeder andere, und Items wie Nackenkissen, Wollsocken oder der 1-L-Zip-Beutel tragen ihn. Dasselbe gilt für die Unterkunft: Wer im Hotel schläft, braucht kein Handtuch und keinen Föhn — beides trägt `Hotel` einfach nicht. Ein weiteres Verkehrsmittel oder eine weitere Übernachtungsart ist damit keine Formularänderung, sondern eine Katalogänderung: Sie braucht ein Item, das den Tag trägt.
 
 Die **abgeleiteten Reise-Tags** sind die Vereinigung aus:
 `{saison-Tags} ∪ aktivitaeten ∪ {verkehrsmittel} ∪ {unterkunft} ∪ zusatz_tags ∪ {"Allgemein"}`
@@ -837,7 +839,7 @@ Reihenfolge = Anzeigereihenfolge. Essentials zuerst, Ausrüstung in der Mitte, S
 | 7 | **Tauchausrüstung** | neu | Ausdrücklicher Wunsch. Nimmt Tauchanzug, Maske, Flossen, Booties, **Tauchcomputer, Lampe** auf |
 | 8 | **Campingausrüstung** | neu | Zelt, Schlafsack, Isomatte, Kocher, Lampe. War als Tag vorhanden, aber ohne Kategorie |
 | 9 | **Taschen & Ordnung** | neu | Rucksack, Kulturbeutel, Tagesrucksack, Packwürfel, **Zip-Beutel**. Die Behälter selbst sind Packgüter |
-| 10 | Verpflegung | neu | Snacks, Trinkflasche, Tee, Kaffee. Relevant für Camping, Flug, Zug |
+| 10 | Verpflegung | neu | Snacks, Trinkflasche, Tee, Kaffee. Relevant für Camping und Flug |
 | 11 | Haushalt & Sonstiges | neu | Catch-all: Wäscheleine, Nähzeug, Schirm, Taschenmesser |
 
 **11 Kategorien.** Alle Entscheidungen sind getroffen; die Liste ist gefroren.
@@ -850,9 +852,9 @@ Gespeichert als flache Strings; gruppiert nur für die Darstellung im Formular.
 |---|---|---|
 | **Basis** | Allgemein, Reiseapotheke | Excel + neu |
 | **Klima / Saison** | Winter, Sommer, Übergangszeit, Regen | Excel + neu (Übergangszeit, Regen) |
-| **Verkehrsmittel** | Flugzeug, Auto, Zug | neu |
+| **Verkehrsmittel** | Flugzeug | neu |
 | **Aktivität** | Tauchen, Festival, Wandern, Strand, Ski, Arbeit, Fotografie, UW-Fotografie | Excel + neu |
-| **Unterkunft** | Camping, Ferienwohnung, Hotel, Hostel, Freunde | Excel + neu |
+| **Unterkunft** | Camping, Ferienwohnung, Hotel, Hostel | Excel + neu |
 | **Person** | Damen, Herren — **nicht in `TAG_GRUPPEN`** | neu (§4.6) |
 
 `Camping` liegt unter **Unterkunft**, nicht unter Aktivität — man übernachtet beim Camping, das ist die Variable, die die Ausrüstung bestimmt. `Zelt` als eigener Tag entfällt damit.
@@ -868,7 +870,7 @@ Eine **Anlass**-Gruppe entfällt ersatzlos.
 | **Reiseapotheke** | Hat die Kategorie `Medizin` von `Allgemein` gelöst. Die 47 Medizin-Items waren ein Drittel jeder Packliste (47 von 151 Positionen auf einer typischen Reise) — eine Reiseapotheke packt man aber nicht in dieser Breite ein. Der Tag steht unter **Basis**, weil er wie `Allgemein` die Grundausstattung beschreibt, nicht einen Anlass |
 | **Übergangszeit** | Zwischen Winter und Sommer liegt der Großteil der Reisen. Ohne diesen Tag gibt es für milde Reisen keine saubere Auswahl — man landet bei Winter oder Sommer und packt falsch |
 | **Regen** | Regenjacke, Schirm, wasserdichte Schuhe. Trifft jede Jahreszeit und ist unabhängig von der Saison — deshalb ist `saison` seit 1.11 eine **Mehrfachauswahl**: `Regen` tritt neben die Jahreszeit, statt sie zu ersetzen. Vorher war der Tag nicht erreichbar: er stand in der Gruppe, aber nicht in der Auswahlliste |
-| **Flugzeug / Auto / Zug** | Ausdrücklicher Wunsch. Ersetzt jedes Verkehrsmittel-Regelwerk durch Tags (§4.3) |
+| **Flugzeug** | Ausdrücklicher Wunsch. Ersetzt jedes Verkehrsmittel-Regelwerk durch Tags (§4.3). `Auto` und `Zug` standen daneben und sind in 1.13 entfallen — sie trugen kein Item, ein Umstieg auf die Bahn hätte an der Liste nichts geändert |
 | **Wandern** | Sehr häufige Aktivität; eigene Ausrüstung (Stöcke, Blasenpflaster, Rucksack) |
 | **Strand** | Handtuch, Strandtasche, Sonnenschutz, Schnorchel — überschneidet sich mit Sommer, aber nicht deckungsgleich |
 | **Ski** | Wintersport braucht völlig eigenes Gerät; ohne diesen Tag ist `Winter` zu grob |
@@ -878,9 +880,8 @@ Eine **Anlass**-Gruppe entfällt ersatzlos.
 | **Ferienwohnung** | Selbstversorgung: Küchenausstattung, Wäscheleine, Einkaufsbeutel. Ein Hotel braucht davon nichts |
 | **Hotel** | Gegenstück zur Ferienwohnung: keine Küche, dafür Handtücher und Föhn vorhanden. Handtuch und Föhn werden deshalb einfach *nicht* mit `Hotel` getaggt — sie brauchen kein `nicht_mit` |
 | **Hostel** | Wie Hotel, plus Schloss für Schließfach, Ohrstöpsel, Flip-Flops für Gemeinschaftsduschen |
-| **Freunde** | Übernachtung bei Bekannten: Geschenk, kein Handtuch nötig, dafür weniger Gepäck |
 
-**Bewusst nicht aufgenommen**: `Tropen`, `Winterurlaub`, `Business` — noch zu spekulativ. Sie im Formular einzutippen half nicht (1.11): ein Tag, den kein Item trägt, ändert an der Liste nichts. Wenn ein Kontext nach drei Reisen immer noch fehlt, kommt er in diese Liste — und zugleich an die Items.
+**Bewusst nicht aufgenommen**: `Tropen`, `Winterurlaub`, `Business` — noch zu spekulativ. Sie im Formular einzutippen half nicht (1.11): ein Tag, den kein Item trägt, ändert an der Liste nichts. Wenn ein Kontext nach drei Reisen immer noch fehlt, kommt er in diese Liste — und zugleich an die Items. Aus demselben Grund sind in 1.13 `Auto`, `Zug` und `Freunde` **entfallen**: sie standen im Vokabular, aber an keinem Item — `Freunde` hätte „Geschenk, kein Handtuch" versprochen, ohne es zu halten.
 
 #### B.3 Bezug zum Import
 
@@ -922,6 +923,7 @@ Dabei entstehen zwei Lücken, die der Import-Report (F7) ausweisen muss:
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 1.13 | 2026-10-09 | **`Auto`, `Zug` und `Freunde` entfallen.** Alle drei standen im Vokabular (Anhang B.2) und trugen kein einziges Item: eine Auswahl hätte an keiner Packliste etwas geändert, sie hat nur etwas versprochen — `Freunde` sogar ausdrücklich („Geschenk, kein Handtuch nötig"). `Hotel` bleibt, obwohl auch dort heute kein Item hängt: die Begründung in Anhang B.2 steht (Handtuch und Föhn werden bewusst *nicht* mit `Hotel` getaggt, §4.3), und das ist eine Katalogfrage, kein Vokabularfehler. `VERKEHRSMITTEL` und `UNTERKUNFT` werden jetzt wie `SAISONS` aus `TAG_GRUPPEN` **abgeleitet**; die handgeschriebenen Kopien waren dieselbe Fehlerquelle, die `Regen` unerreichbar gemacht hatte (1.11). Damit die Einzelauswahlen sich wie die Mehrfachauswahlen verhalten, zeigt das Formular einen Wert außerhalb des Vokabulars — Altbestand oder zweites Gerät mit alter Version — als entfernbaren Chip, statt ihn nur im Speicher zu lassen |
 | 1.12 | 2026-10-09 | **`Übergangszeit` greift jetzt an der Kleidung.** `Dünne Jacke` und `Dünner Schal` hingen nur an `Winter` — eine milde Reise brachte damit 83 Items und **keine Jacke** außer der `Regenjacke`, obwohl Anhang B.2 den Tag genau dafür eingeführt hat („für milde Reisen keine saubere Auswahl"). Beide tragen jetzt `Winter` **und** `Übergangszeit`: im Winter bleiben sie, in der Übergangszeit kommen sie neu dazu. 85 statt 83 Items auf einer milden Reise. Das ist kein `nicht_mit`-Fall, sondern ein fehlender positiver Tag (§5.3) |
 | 1.11 | 2026-10-09 | **Tags werden nur noch gewählt, `Regen` wird ein Klima-Tag — und `saison` eine Mehrfachauswahl.** Die drei Freitextfelder im Reise-Formular fallen weg: unter „Aktivitäten", unter „Zusätzliche Tags" und in jeder Personenzeile, samt Vorschlagsliste. Sie versprachen, einen neuen Tag anzulegen, wirkten aber nur, wenn der Katalog den Tag bereits exakt so trug — und da *jeder* im Katalog benutzte Tag ohnehin in `TAG_GRUPPEN` stand, war der Nutzen null und die Verwirrung real: drei Felder, zwei Ziele (`aktivitaeten` vs. `zusatz_tags`), ein gemeinsamer Vorschlagsvorrat. Ein neuer Kontext ist eine Katalogänderung; **F8 und FR5 entfallen** (beide P0). `Regen` war bis dahin unerreichbar: er stand in der Gruppe „Klima / Saison" (Anhang B.2) und wurde von `Gummistiefel` und `Schirm` getragen, aber `SAISONS` zählte nur drei Werte auf — man kam nur über den Freitext an ihn. `SAISONS` wird jetzt wie `AKTIVITAETEN` und `BASIS_TAGS` aus `TAG_GRUPPEN` **abgeleitet**, damit Vokabular und Gruppe nicht mehr auseinanderlaufen können. Wäre `Regen` ein vierter Schalter unter Entweder-oder-Bedingungen, würde er die Jahreszeit *ersetzen*: auf einer verregneten Winterreise fiele die Winter-Auswahl weg. Deshalb ist **`saison` eine Mehrfachauswahl** (`["Winter", "Regen"]`) — das PRD begründet den Tag ohnehin als „unabhängig von der Saison". Der Altwert als einzelner String bleibt lesbar (`saisonListe` in der Engine); die Migration liegt in `normalisiereDaten`, durch das Laden, Import und Sync-Merge ohnehin alle laufen. Ein Wert außerhalb des Vokabulars — Altbestand oder ein zweites Gerät mit alter Version — bleibt als entfernbarer Chip sichtbar, sonst wäre er unsichtbar und unlöschbar. Katalogseitig hat 1.10 (`Städtetrip` entfällt) `Schirm` auf `Camping`/`Regen` verengt — seitdem führt an Schirm und Gummistiefeln ohne Camping nur noch `Regen` vorbei, weshalb der Tag nicht länger im toten Winkel stehen darf |
 | 1.10 | 2026-10-09 | **Tag `Städtetrip` entfällt.** Er trug genau ein Item (`Schirm`) und diente dort allein dem Ausschluss-Fall aus §5.3 — ohne ihn ist die Liste der Reise-Kontexte ehrlicher, und §5.3 zeigt sein Beispiel jetzt am Geschlecht (`Binden`), dem einzigen Ausschluss, den der Katalog heute wirklich braucht. `Devil Sticks` und `Poi` hängen nur noch an `Festival` statt an `Camping`/`Festival`: es sind Jongliergeräte, keine Zeltausrüstung. Nachtrag zu 1.9: die Geschlechts-Markierung im Katalog ist inzwischen erfolgt — 16 Items tragen `Damen` bzw. `Herren` in `nicht_mit`, die Notiz in 1.9 („steht noch aus") ist damit erledigt |

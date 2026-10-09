@@ -35,6 +35,8 @@ import {
   saisonListe,
   KATEGORIEN,
   SAISONS,
+  VERKEHRSMITTEL,
+  UNTERKUNFT,
   BEKANNTE_TAGS,
   PERSON_TAGS,
   GESCHLECHT_TAGS,
@@ -238,8 +240,17 @@ test('Allgemein lässt sich nicht abwählen', () => {
 });
 
 test('Verkehrsmittel ist ein Tag wie jeder andere (O7)', () => {
-  assert.ok(tripTags({ verkehrsmittel: 'Auto' }).has('Auto'));
-  assert.ok(!tripTags({ verkehrsmittel: 'Auto' }).has('Flugzeug'));
+  const tags = tripTags({ verkehrsmittel: 'Flugzeug' });
+  assert.ok(tags.has('Flugzeug'), 'der gewählte Wert wird ein Tag');
+  assert.deepEqual([...tags].sort(), ['Allgemein', 'Flugzeug'], 'und sonst kommt nichts dazu');
+});
+
+test('Auto, Zug und Freunde sind entfallen (1.11)', () => {
+  // Sie trugen kein einziges Item: eine Auswahl hätte an keiner Liste etwas
+  // geändert. `Hotel` und `Übergangszeit` bleiben — beide sind leer, aber
+  // plausibel; die beiden Listen kommen aus `TAG_GRUPPEN`.
+  assert.deepEqual(VERKEHRSMITTEL, ['Flugzeug']);
+  assert.deepEqual(UNTERKUNFT, ['Camping', 'Ferienwohnung', 'Hotel', 'Hostel']);
 });
 
 /* --- Auswahl (PRD §5.1) ---------------------------------------------------- */
@@ -626,7 +637,7 @@ test('echter Katalog: jede Reise erzeugt eine vollständige Liste', { skip: nurM
 });
 
 test('echter Katalog: Winterreise und Sommerreise unterscheiden sich', { skip: nurMitEchtemKatalog }, () => {
-  const basis = { id: 'x', von: '2026-02-01', bis: '2026-02-07', aktivitaeten: [], unterkunft: 'Hotel', verkehrsmittel: 'Zug' };
+  const basis = { id: 'x', von: '2026-02-01', bis: '2026-02-07', aktivitaeten: [], unterkunft: 'Hotel', verkehrsmittel: 'Flugzeug' };
   const winter = erzeugePackliste(katalog, { ...basis, saison: 'Winter' });
   const sommer = erzeugePackliste(katalog, { ...basis, saison: 'Sommer' });
 

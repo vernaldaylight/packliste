@@ -584,7 +584,7 @@ test('Overrides überleben: abhaken, Menge ändern, entfernen, hinzufügen (US-0
     bis: '2026-06-03',
     saison: 'Sommer',
     aktivitaeten: [],
-    verkehrsmittel: 'Zug',
+    verkehrsmittel: 'Flugzeug',
     unterkunft: 'Hotel',
   };
 

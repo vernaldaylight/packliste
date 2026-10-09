@@ -87,30 +87,36 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
 
   /** Ein Schalter, genau einer aktiv (Verkehrsmittel, Unterkunft). */
   function einerAus(wert, setze, container, optionen) {
+    const an = wert();
+    const kenneIch = optionen.includes(an);
     container.replaceChildren(
       ...optionen.map((o) =>
         h(
           'button',
           {
             type: 'button',
-            class: `chip chip-schalter${wert() === o ? ' ist-an' : ''}`,
-            'aria-pressed': String(wert() === o),
+            class: `chip chip-schalter${an === o ? ' ist-an' : ''}`,
+            'aria-pressed': String(an === o),
             onclick: () => {
-              setze(wert() === o ? '' : o);
+              setze(an === o ? '' : o);
               aktualisiere();
             },
           },
           o
         )
       ),
-      // Abwählen ist ausdrücklich möglich: ohne Saison-Tag bleibt es bei Allgemein.
-      wert() === ''
-        ? h('span', { class: 'klein' }, '— keiner gewählt')
-        : h(
-            'button',
-            { type: 'button', class: 'chip chip-leise', onclick: () => { setze(''); aktualisiere(); } },
-            'abwählen'
-          )
+      // Ein Wert außerhalb des Vokabulars — Altbestand oder ein zweites Gerät mit
+      // alter Version — bleibt als entfernbarer Chip sichtbar, wie in `mehrereAus`.
+      ...(an && !kenneIch
+        ? [entfernbarerChip(an, () => { setze(''); aktualisiere(); })]
+        : []),
+      // Abwählen ist ausdrücklich möglich: ohne Verkehrsmittel/Unterkunft bleibt
+      // es bei Allgemein. Beim Altbestand erledigt das der ×-Knopf am Chip.
+      ...(an === ''
+        ? [h('span', { class: 'klein' }, '— keiner gewählt')]
+        : kenneIch
+          ? [h('button', { type: 'button', class: 'chip chip-leise', onclick: () => { setze(''); aktualisiere(); } }, 'abwählen')]
+          : [])
     );
   }
 

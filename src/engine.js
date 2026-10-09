@@ -38,16 +38,19 @@ export const KATEGORIEN = [
  * Kontext-Tags, gruppiert für die Darstellung im Formular (PRD Anhang B.2, O10).
  * Gespeichert wird flach — die Gruppe ist reine Darstellung und ändert das
  * Datenmodell nicht.
+ *
+ * Diese Liste ist das Vokabular: sie bestimmt, was im Formular wählbar ist.
+ * `Auto`, `Zug` und `Freunde` sind in 1.11 entfallen — kein Item trug sie.
  */
 export const TAG_GRUPPEN = [
   { gruppe: 'Basis', tags: ['Allgemein', 'Reiseapotheke'] },
   { gruppe: 'Klima / Saison', tags: ['Winter', 'Sommer', 'Übergangszeit', 'Regen'] },
-  { gruppe: 'Verkehrsmittel', tags: ['Flugzeug', 'Auto', 'Zug'] },
+  { gruppe: 'Verkehrsmittel', tags: ['Flugzeug'] },
   {
     gruppe: 'Aktivität',
     tags: ['Tauchen', 'Festival', 'Wandern', 'Strand', 'Ski', 'Arbeit', 'Fotografie', 'UW-Fotografie'],
   },
-  { gruppe: 'Unterkunft', tags: ['Camping', 'Ferienwohnung', 'Hotel', 'Hostel', 'Freunde'] },
+  { gruppe: 'Unterkunft', tags: ['Camping', 'Ferienwohnung', 'Hotel', 'Hostel'] },
 ];
 
 /** Alle bekannten Tags, flach — das Vokabular der Reisekontexte, als Ganzes. */
@@ -73,8 +76,13 @@ export const WAHLBARE_BASIS_TAGS = BASIS_TAGS.filter((t) => t !== BASIS_TAG);
  */
 export const SAISONS = TAG_GRUPPEN.find((g) => g.gruppe === 'Klima / Saison').tags;
 
-export const VERKEHRSMITTEL = ['Flugzeug', 'Auto', 'Zug'];
-export const UNTERKUNFT = ['Camping', 'Ferienwohnung', 'Hotel', 'Hostel', 'Freunde'];
+/**
+ * Die Einfachauswahlen des Formulars — wie `SAISONS` aus der Gruppe abgeleitet
+ * statt neu getippt. Handgeschriebene Kopien liefen sonst aus der Gruppe heraus;
+ * genau daran war `Regen` unerreichbar (1.11).
+ */
+export const VERKEHRSMITTEL = TAG_GRUPPEN.find((g) => g.gruppe === 'Verkehrsmittel').tags;
+export const UNTERKUNFT = TAG_GRUPPEN.find((g) => g.gruppe === 'Unterkunft').tags;
 
 /**
  * Aktivitäten ohne die Unterkunft-Tags — die stehen im Formular in einem

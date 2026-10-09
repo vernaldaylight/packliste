@@ -161,6 +161,14 @@
         const schalter = [...app.querySelectorAll('.chip-schalter')];
         pruefe('Saison-Schalter vorhanden', schalter.length > 10);
 
+        // Das Vokabular kommt aus `TAG_GRUPPEN` (1.11): die entfallenen Tags
+        // dürfen nirgends mehr als Schalter stehen, `Flugzeug` als einziger
+        // Verkehrsmittel-Schalter schon.
+        const chipTexte = schalter.map((c) => c.textContent);
+        pruefe('entfallene Tags sind keine Schalter mehr', ['Auto', 'Zug', 'Freunde'].every((t) => !chipTexte.includes(t)));
+        pruefe('Flugzeug ist der Verkehrsmittel-Schalter', chipTexte.includes('Flugzeug'));
+        pruefe('Hotel bleibt wählbar', chipTexte.includes('Hotel'));
+
         // Tags werden nicht mehr eingetippt (1.10) — dafür ist Saison eine
         // Mehrfachauswahl. Der Bestand oben trägt `saison` noch als String
         // ('Sommer'); er muss als gewählter Chip ankommen.
