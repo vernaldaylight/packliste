@@ -1,6 +1,6 @@
 # Packliste — Product Requirements Document
 
-**Version**: 1.8
+**Version**: 1.9
 **Datum**: 2026-10-08
 **Autor**: Sarah
 **Status**: Abgestimmt — bereit für die Umsetzung. Technische Architektur entschieden (§3.6). Der Katalog-Editor ist aus dem MVP in die erste Überarbeitung verschoben (FF-16).
@@ -125,7 +125,7 @@ Für unbekannte Aktivitäten lässt sich ein neuer Tag frei eintippen — die Ap
 
 ### 3.4 Out of Scope (MVP)
 
-- **Mehrbenutzer** — getrennte Kataloge pro Person, geteilte Reisen. Architektur soll es nicht verbauen (Item-Katalog als eigene Entität), aber es wird nicht gebaut.
+- **Mehrbenutzer in der Vollform** — getrennte Kataloge pro Person (FF-04), Zuständigkeiten pro Item (FF-05), gemeinsame Verbrauchsgüter (FF-06). Das **Fundament** dagegen steht seit `version: 2`: ein Personen-Register, Teilnehmer je Reise, eine Packliste pro Person (§4.6). Was fehlt, ist der Teil, der ohne gemeinsame Liste nicht zu haben ist — siehe FF-05/FF-06.
 - **LLM-gestützte Auswahl oder Vorschläge**
 - **Vorschlagen von Items, die man noch nicht im Katalog hat** ("besitzt du eine Tauchmaske?")
 - **Tag-Verwaltung** (umbenennen, zusammenführen, löschen über viele Items)
@@ -251,8 +251,18 @@ Reise {
   verkehrsmittel: "Flugzeug" | "Auto" | "Zug"
   unterkunft: "Camping" | "Ferienwohnung" | "Hotel" | "Hostel" | "Freunde"
   zusatz_tags: string[]           // manuell ergänzt/entfernt
+  teilnehmer: Teilnehmer[]        // leer = Reise ohne Personen (§4.6)
+}
+
+Teilnehmer {
+  person_id: string               // zeigt auf einen Eintrag in `personen` (§4.5)
+  aktivitaeten: string[]          // NUR für diese Person, z. B. ["Fotografie"]
 }
 ```
+
+`teilnehmer` ist der **einzige** personenbezogene Teil der Reise. Das Geschlecht steht an der Person im Register, nicht hier: es gilt für alle ihre Reisen. Die Aktivitäten stehen hier, nicht an der Person — was jemand auf *dieser* Reise tut, sagt die Reise.
+
+Eine Reise ohne `teilnehmer` ist der Altbestand und verhält sich wie vor dem Personen-Feature (§4.6).
 
 **Verkehrsmittel und Unterkunft sind keine Sonderfälle, sondern Tag-Quellen.** Es gibt kein Regelwerk und keine Warnungen: `Flugzeug` ist ein Tag wie jeder andere, und Items wie Nackenkissen, Wollsocken oder der 1-L-Zip-Beutel tragen ihn. Wer mit dem Auto fährt, bekommt diese Items einfach nicht — und dafür alle Items mit Tag `Auto`. Dasselbe gilt für die Unterkunft: Wer im Hotel schläft, braucht kein Handtuch und keinen Föhn.
 
@@ -266,12 +276,15 @@ Die Packliste ist eine **Momentaufnahme**, kein Live-View. Beim Erzeugen wird si
 ```
 Packliste {
   reise_id: string
+  person_id: string | null        // null = Liste für die Reise als Ganzes
   erzeugt_am: datetime
   positionen: [
     { item_id, menge, gepackt: boolean, manuell_hinzugefuegt: boolean }
   ]
 }
 ```
+
+Der Schlüssel einer Packliste ist ab `version: 2` das **Paar** `(reise_id, person_id)` — nicht die Reise allein. Eine Reise mit zwei Personen hat zwei Listen; über `reise_id` allein wäre die zweite die erste. `person_id: null` ist der Altbestand: eine Liste von vor dem Personen-Feature oder die eine Liste einer Reise ohne Teilnehmer. Alten Listen wird beim Laden **kein** `person_id` angedichtet — das änderte ihre Identität; Leser nehmen `p.person_id ?? null`.
 
 ### 4.5 Persistenz
 
@@ -280,15 +293,21 @@ Kein Server-Prozess, keine DB, keine Konten. Die Trennung nach Wert bleibt — s
 | Datensatz | Inhalt | Master liegt | Am Gerät |
 |---|---|---|---|
 | `katalog.json` | `items` | **privates Daten-Repo** | `localStorage`, Arbeitskopie |
-| `reisen.json` | `reisen`, `packlisten` | **privates Daten-Repo** | `localStorage`, Arbeitskopie |
+| `reisen.json` | `personen`, `reisen`, `packlisten` | **privates Daten-Repo** | `localStorage`, Arbeitskopie |
 
 ```json
 // katalog.json  — im privaten Daten-Repo, NICHT im App-Repo, NICHT deployt
 { "version": 1, "items": [ ... ] }
 
 // reisen.json  — im privaten Daten-Repo; entsteht beim ersten Hochschieben
-{ "version": 1, "reisen": [ ... ], "packlisten": [ ... ] }
+{ "version": 2, "personen": [ ... ], "reisen": [ ... ], "packlisten": [ ... ] }
 ```
+
+**Eine Naht für alle Lesewege.** `personen` kam mit `version: 2` dazu, und es gibt vier Stellen, an denen ein Reise-Datensatz von außen hereinkommt: der `localStorage`, die Import-Datei (US-10), der Sync (§4.5) und das Ersetzen beim Import. Jede davon, die die Felder selbst aufzählt, verliert `personen` still — drei davon taten das. Sie gehen deshalb alle durch **`normalisiereDaten`** in `store.js`, das fehlende Felder auffüllt: `personen: []`, `reise.teilnehmer: []`. Die Version wird nirgends verzweigt; der Bump ist ein Signal an den Menschen, kein Schutz — die Arbeit macht die Normalisierung, und sie wirkt unabhängig von der Version. Eine Migrationsmaschinerie gibt es bewusst nicht, alles ist additiv.
+
+Daraus folgt die Regel für neuen Code: **kein Feld eines Reise-Datensatzes von Hand zusammenbauen.** Wer `{ version, reisen, packlisten }` schreibt, hat das nächste Feld schon vergessen.
+
+Der Known-Loss: eine **alte App-Version** auf einem zweiten Gerät kennt `personen` nicht und verwirft es beim Hochschieben. Der Versions-Bump verhindert das nicht. Bewusst akzeptiert (§11).
 
 **Warum getrennt**: Der Katalog ist der einzige Teil, dessen Verlust echte Arbeit kostet. Reisen und Packlisten sind Ableitungen. Getrennt gehalten kann ein schiefgelaufener Schreibvorgang auf einer Packliste den Katalog nicht beschädigen.
 
@@ -304,7 +323,7 @@ Kein Server-Prozess, keine DB, keine Konten. Die Trennung nach Wert bleibt — s
 
 **Der Katalog geht nur in eine Richtung.** Er wird am Mac bearbeitet; die App hat keinen Grund, ihn zu schreiben. Damit schrumpft die Schreibfläche des Tokens auf `reisen.json` — und der Schreibweg ist der Teil, der schiefgehen kann.
 
-**Zusammengeführt wird über die `id`, nicht über Felder.** Gleiche `id` wird ersetzt, Neues angehängt, Hiesiges bleibt. Eine Packliste gehört zu genau einer Reise und wird als Ganzes ersetzt, nicht positionenweise gemischt — sonst verlöre man beim Holen den Abhak-Stand. Kommt eine Reise ohne Packliste herein, bleibt die hiesige erhalten. **Es gibt keinen Zeitstempel im Datenmodell**: wer zuletzt geschrieben hat, entscheidet der Sync nicht aus den Daten, sondern über die `sha` der Contents-API.
+**Zusammengeführt wird über die `id`, nicht über Felder.** Gleiche `id` wird ersetzt, Neues angehängt, Hiesiges bleibt — das gilt für Reisen und für Personen (das Register wird über die `person_id` zusammengeführt). Eine Packliste gehört zu genau einer Reise **und einer Person** und wird als Ganzes ersetzt, nicht positionenweise gemischt — sonst verlöre man beim Holen den Abhak-Stand. Ihr Schlüssel ist deshalb das Paar aus `reise_id` und `person_id`: mit `reise_id` allein überschriebe die zweite Person still die Liste der ersten. Kommt eine Reise ohne Packliste herein, bleibt die hiesige erhalten. **Es gibt keinen Zeitstempel im Datenmodell**: wer zuletzt geschrieben hat, entscheidet der Sync nicht aus den Daten, sondern über die `sha` der Contents-API.
 
 **Der Konflikt wird erkannt, nicht überschrieben.** Die API verlangt beim Schreiben die `sha` der zuletzt gelesenen Fassung; passt sie nicht mehr, antwortet sie mit `409`/`422` und **es wird nichts geschrieben**. Die App zeigt dann drei Wege: *von drüben holen* (führt zusammen), *meinen Stand hochschieben* (ersetzt, bewusst), *nichts tun*. Das ist der ganze Konfliktmechanismus — er braucht weder Server noch Schemaänderung, weil die `sha` die Erkennung trägt.
 
@@ -323,6 +342,33 @@ Drei Nebeneffekte, die den Aufwand sofort rechtfertigen:
 - Getrennte Kataloge pro Person (FF-04) brauchen später nur eine weitere `katalog-<person>.json` — die Reise-Daten bleiben unberührt.
 
 Jede Struktur trägt `version` für spätere Migrationen. Vor jedem Schreiben wird die Vorgängerversion als Backup gesichert.
+
+**Ein zweiter Preis, mit dem Personen-Feature:** `reisen.json` wächst mit jeder Person um eine Liste. Das 1-MB-Limit der Contents-API (`sync.js`) ist die Grenze; sie wird geprüft und **vor** dem Senden gemeldet, es gibt also keinen stillen Verlust — aber sie rückt näher. Bei zwei Personen und einer Handvoll Reisen ist sie weit weg.
+
+---
+
+### 4.6 Personen
+
+Zwei Menschen, eine Reise. Bisher war das nicht abbildbar: es gab **eine** Packliste pro Reise und keinen Begriff von Personen. Das Fundament dafür steht jetzt — die Unterschiede zwischen zwei Menschen sind genau zwei:
+
+| Unterschied | Wo er steht | Wie er wirkt |
+|---|---|---|
+| **Geschlecht** | an der Person, im globalen Register | als Katalog-Tag `Damen` / `Herren` (§5.1) |
+| **eigene Aktivitäten** | an der Person *in dieser Reise* (`teilnehmer`) | als ganz normale Aktivitäts-Tags |
+
+**Personen sind ein globales Register**, keine Eigenschaft einer Reise: `daten.personen = [{ id, name, geschlecht }]`. Wer mitfährt, verweist über `person_id` darauf. Zweimal dieselbe Person auf zwei Reisen heißt also: zwei Verweise, ein Eintrag — das Geschlecht wird einmal gepflegt.
+
+**Aktivitäten sind reisebezogen.** Was jemand auf *dieser* Reise tut (Fotografie, Arbeit), steht am Teilnehmer, nicht an der Person. Sonst müsste man pro Reise doch wieder überschreiben. Ein späteres `person.standard_aktivitaeten` als Vorbelegung bleibt möglich und wäre additiv.
+
+**Wie das Geschlecht auf die Auswahl wirkt.** Der Katalog taggt geschlechtsspezifische Items — `Binden` trägt `Herren` in `nicht_mit`, `Badehose` ebenso. Die Person fügt ihrem Tag-Satz ihr Geschlechts-Tag hinzu; dadurch greift der Ausschluss bei der jeweils anderen Person. Die Begründung für diese Schreibweise steht in §5.1.
+
+**Zwei Listen, zwei Fortschritte.** Eine Reise mit zwei Teilnehmern hat zwei Packlisten, jede mit eigenem Abhak-Stand. Das ist keine Darstellungsfrage: wer gepackt hat, will wissen, ob *sein* Koffer fertig ist. Der Fortschritt einer Liste zählt nur ihre eigenen Häkchen, und die Startansicht zeigt eine Zeile je Person.
+
+**Adressen.** Die Liste einer Person liegt unter `#/liste/:reiseId/:personId`. Die alte Adresse `#/liste/:reiseId` bleibt gültig und landet auf der ersten Person. Die Reise selbst kennt keine Person in ihrer Adresse — sie beschreibt die Reise, nicht den Menschen.
+
+**Eine Person löschen entfernt keine Listen.** Sie fällt aus dem Register und aus allen Reisen, aber die erzeugten Listen bleiben im Bestand: sie sind eine Momentaufnahme (§4.4), und wer gerade packt, soll sie nicht unter den Händen verlieren. Sie sind über ihre Reise weiterhin erreichbar.
+
+**Was hier bewusst noch offen ist:** „wer bringt was mit" (FF-05) und gemeinsame Verbrauchsgüter (FF-06) — Handtuch, Zahnpasta, ein Zelt für zwei. Solange das fehlt, steht jedes Item auf beiden Listen, und wer die Zahnpasta einpackt, muss es selbst wissen. Das ist die ehrliche Grenze dieses Fundaments.
 
 ---
 
@@ -344,7 +390,33 @@ gruppieren nach item.kategorie
 sortieren: Kategorien in fester Reihenfolge, Items alphabetisch
 ```
 
-`"Allgemein"` ist implizit in jeder Reise enthalten — das ist das Fundament, auf dem alles andere aufsetzt (Zahnbürste, Ladegerät, Reisepass).
+`"Allgemein"` ist implizit in jeder Reise enthalten — das ist das Fundament, auf dem alles andere aufsetzt (Zahnbürste, Ladegerät, Reisepass). Es lässt sich nicht abwählen: es steht nicht in der Liste der abgeleiteten Tags, die das Formular zum Streichen anbietet.
+
+**Mit einer Person** kommt deren Geschlechts-Tag dazu, und ihre eigenen Aktivitäten:
+
+```
+tripTagsFuerPerson = tripTags(reise) ∪ teilnehmer.aktivitaeten ∪ {Geschlechtstag}
+```
+
+Die Aktivitäten der Person werden **nach** `entfernte_tags` hinzugefügt und gewinnen damit: sie sind die ausdrückliche Angabe dieser Person, ein Streichen an der Reise gilt für sie nicht. `Damen`/`Herren` stehen **nicht** in `TAG_GRUPPEN` — sie sind kein Reise-Kontext, sondern eine Personen-Eigenschaft, und tauchen deshalb in keinem Chip und keiner Vorschlagsliste des Reise-Formulars auf.
+
+#### Das Geschlecht steht in `nicht_mit`, nicht in `tags`
+
+Ein geschlechtsspezifisches Item trägt das **andere** Geschlecht als Ausschluss:
+
+```
+Item "Binden"   { tags: ["Allgemein"],            nicht_mit: ["Herren"] }
+Item "Bikini"   { tags: ["Sommer", "Strand"],     nicht_mit: ["Herren"] }
+Item "Badehose" { tags: ["Sommer", "Strand"],     nicht_mit: ["Damen"]  }
+```
+
+Das ist nicht Geschmack, sondern Notwendigkeit — die andere Schreibweise ist kaputt. Trüge `Badehose` stattdessen `tags: ["Herren"]`, wäre sie auf **jeder** Reise des Mannes dabei, auch auf dem Winter-Städtetrip. Trüge sie `["Sommer", "Strand", "Herren"]`, wäre sie im Sommer bei **allen** dabei, auch bei der Frau: die Auswahl ist eine Oder-Verknüpfung über die Tags, ein „Herren **und** Sommer" lässt sich darin nicht ausdrücken.
+
+Der Ausschluss dagegen kombiniert sich sauber mit allem anderen: `nicht_mit` hat Vorrang vor den positiven Tags (§5.3), also bleibt „nur für ihn" mit „nur im Sommer" verträglich. Möglich ist das, weil das Geschlechts-Tag der Person im Tag-Satz liegt — für Ben greift `nicht_mit: ["Herren"]`, für Anna nicht.
+
+Die Pflegeregel für den Katalog lautet damit: **ein Geschlecht gehört immer in `nicht_mit`, nie in `tags`.**
+
+Eine Reise ohne Teilnehmer hat kein Geschlechts-Tag, also greift auch kein Ausschluss: die Liste enthält dann beide Geschlechter-Items. Das ist der Altbestand (§4.6) und die richtige Voreinstellung — lieber zu viel als ein fehlendes Medikament.
 
 ### 5.2 Beispiel
 
@@ -649,6 +721,9 @@ Solo, Abendarbeit, parallel zum Kurs. Vier Wochen bis nutzbarer MVP.
 | O11 | Wie wird `katalog.json` vor fremdem Zugriff geschützt? | ✅ **Entschieden: durch ein privates Repo.** Der Katalog liegt in einem **privaten** Daten-Repo, nicht im App-Repo und nicht im Deployment. Weil er Medikamente nennt, ist das kein „erübrigt sich" mehr, sondern eine echte Anforderung. Das öffentliche App-Repo trägt nur die Hülle; die Deploy-URL darf damit öffentlich sein, und es braucht weder Passwort noch Cloudflare Access (§4.5) |
 | O12 | Gist oder privates Repo als Datenspeicher? | ✅ **Privates Repo.** „Secret" heißt bei GitHub nur *nicht gelistet* — jeder mit der URL liest mit. Dazu gilt ein Gist-Token für **alle** Gists, ein fein granuliertes Repo-Token dagegen für genau eines |
 | O13 | Braucht der Sync eine Merge-Regel? | ✅ **Nein, aber ein `sha`.** Zusammengeführt wird über die `id` (gleiche ersetzt, Neues dazu) — das ist keine Feld-Merge-Regel und braucht keinen Zeitstempel. Ob drüben inzwischen etwas anderes liegt, erkennt die `sha` der Contents-API, nicht die Daten (§4.5) |
+| O14 | Wie wird das Geschlecht einer Person abgebildet — neues Item-Feld oder Tag? | ✅ **Als Tag** (`Damen`/`Herren`), kein neues Feld am Item. Ein Feld hätte die Auswahllogik (§5.1) um eine zweite, andersartige Achse erweitert; als Tag fügt es sich in die bestehende Oder-Verknüpfung ein. **Aber in `nicht_mit`, nicht in `tags`** — die Begründung steht in §5.1 und ist keine Geschmacksfrage: als positives Tag ließe sich „nur für ihn" nicht mit einer Saison kombinieren |
+| O15 | Wo lebt eine Person — global oder je Reise? | ✅ **Global.** Ein Register `daten.personen`; die Reise verweist nur über `person_id` (§4.6). Sonst müsste man dieselbe Person auf jeder Reise neu anlegen und ihr Geschlecht mehrfach pflegen |
+| O16 | Gehören die eigenen Aktivitäten an die Person oder an die Reise? | ✅ **An die Reise** (`teilnehmer.aktivitaeten`). Was jemand auf *dieser* Reise tut, ist keine Personeneigenschaft. Eine Vorbelegung an der Person bleibt als additives `person.standard_aktivitaeten` möglich |
 
 **Nur noch eine Frage ist wirklich offen** (O8), und sie ist technisch statt fachlich — sie wird beim Import-Spike entschieden und blockiert nichts. Das fachliche Fundament steht.
 ---
@@ -683,14 +758,19 @@ Das Regel-Ergebnis geht an ein LLM mit der Frage: "Fehlt hier etwas für diese R
 
 ### Stufe 2 — Mehrbenutzer
 
+*Das Fundament dieser Stufe steht seit `version: 2` (§4.6): ein Personen-Register, Teilnehmer je Reise, eine Packliste pro Person mit eigenem Fortschritt. Was hier noch steht, baut darauf auf.*
+
 **FF-04 · Getrennte Kataloge pro Person**
 Jede Person hat ihren eigenen Bestand. Voraussetzung dafür, dass Partner und Freunde mitmachen.
+*Heute gilt ein gemeinsamer Katalog mit `im_besitz` — wer ein Item nicht besitzt, sieht es trotzdem.*
 
 **FF-05 · Geteilte Reisen mit Zuständigkeiten**
 Eine Reise, mehrere Personen, pro Item eine Zuordnung "wer bringt das mit". Löst das Doppelt-Packen von Dingen, die nur einmal gebraucht werden (Föhn, Reiseapotheke, Tauchlampe).
+*Fundament steht (§4.6): Personen, Teilnehmer und getrennte Listen gibt es. Offen ist die Zuordnung selbst — sie setzt eine gemeinsame Sicht auf beide Listen voraus, und die gibt es noch nicht.*
 
 **FF-06 · Gemeinsame Verbrauchsgüter**
 Sonnencreme, Shampoo: eine Person bringt, alle nutzen. Verbindet sich mit FF-05.
+*Bis dahin steht jedes Item auf beiden Listen (§4.6).*
 
 ### Stufe 3 — Komfort
 
@@ -771,8 +851,11 @@ Gespeichert als flache Strings; gruppiert nur für die Darstellung im Formular.
 | **Verkehrsmittel** | Flugzeug, Auto, Zug | neu |
 | **Aktivität** | Tauchen, Festival, Wandern, Strand, Ski, Städtetrip, Arbeit, Fotografie, UW-Fotografie | Excel + neu |
 | **Unterkunft** | Camping, Ferienwohnung, Hotel, Hostel, Freunde | Excel + neu |
+| **Person** | Damen, Herren — **nicht in `TAG_GRUPPEN`** | neu (§4.6) |
 
 `Camping` liegt unter **Unterkunft**, nicht unter Aktivität — man übernachtet beim Camping, das ist die Variable, die die Ausrüstung bestimmt. `Zelt` als eigener Tag entfällt damit.
+
+`Damen` und `Herren` stehen bewusst **nicht** in der Tabelle der Reise-Kontexte: sie gehören zu einer Person, nicht zu einer Reise. Sie stehen in `PERSON_TAGS` und tauchen in keinem Chip und keiner Vorschlagsliste des Reise-Formulars auf. Im Katalog wirken sie ausschließlich in `nicht_mit` — die Begründung steht in §5.1.
 
 Eine **Anlass**-Gruppe entfällt ersatzlos.
 
@@ -838,6 +921,7 @@ Dabei entstehen zwei Lücken, die der Import-Report (F7) ausweisen muss:
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 1.9 | 2026-10-08 | **Personen — das Fundament für zwei Menschen auf einer Reise.** Neues globales Register `daten.personen` (`{id, name, geschlecht}`) und `reise.teilnehmer` (`{person_id, aktivitaeten}`); eine Reise mit zwei Teilnehmern ergibt **zwei** Packlisten, jede mit eigenem Fortschritt. Datenstand `version: 2`, neuer §4.6, neuer Tag-Ort `PERSON_TAGS` in Anhang B.2, O14–O16. **Der Schlüssel einer Packliste ist jetzt das Paar `(reise_id, person_id)`** — über `reise_id` allein überschriebe die zweite Person still die Liste der ersten. Alle vier Nähte, über die ein Reise-Datensatz hereinkommt (`localStorage`, Import-Datei, Sync, Ersetzen beim Import), gehen jetzt durch `normalisiereDaten`; drei davon zählten die Felder vorher selbst auf und hätten `personen` verloren. Alte Stände bleiben ohne Migration lesbar, alten Listen wird kein `person_id` angedichtet. **Geschlecht als Tag, aber in `nicht_mit`:** als positives Tag ließe sich „nur für ihn" nicht mit „nur im Sommer" kombinieren — `Badehose` wäre auf der Winterreise oder bei allen dabei (§5.1). Die Liste einer Person liegt unter `#/liste/:reiseId/:personId`, die alte Adresse bleibt gültig. Das Löschen einer Person entfernt keine Listen. FF-05/FF-06 bleiben offen und sind jetzt als solche benannt. Katalogseitig steht die Geschlechts-Markierung noch aus — bis dahin greift kein Ausschluss, und beide Geschlechter-Items kommen mit |
 | 1.8 | 2026-10-08 | **Auslieferung von Vercel auf GitHub Pages umgestellt.** Vercel lieferte unter der Projekt-Domain eine fremde Next.js-App aus, während die eigenen Deployments seit Stunden als „blocked" scheiterten — der Wirt war nicht mehr nachvollziehbar. Pages liegt im selben Repo wie der Code, das Deployment steht als Datei darin statt in einem Dashboard. Zwei Eigenheiten, die dabei zu beachten sind: Projekt-Seiten liegen unter `/packliste/`, deshalb setzt `vite.config.js` ein `base` — **nur beim Bauen**, damit Entwicklungsserver, Rauchtest und die absoluten Fixture-Pfade unverändert bleiben. Und weil die App über `location.hash` routet, braucht es keine `404.html`-Krücke für Deep-Links. Kopfzeile dieses Dokuments von 1.2 auf den Stand der Historie gezogen |
 | 1.7 | 2026-10-08 | **Zwei Repos statt einem.** Das App-Repo wird öffentlich und enthält nur noch die Hülle; Katalog und `import/` ziehen in ein **privates** Daten-Repo, weil der Katalog Gesundheitsdaten enthält (Medikamentennamen) und `mapping.json` echte Item-Namen — ein einmal veröffentlichter Stand ist nicht zurückzuholen. Datentransfer um **US-11** ergänzt: Abgleich über die GitHub-Contents-API auf Knopfdruck, fein granuliertes PAT nur im `localStorage`. Der Katalog geht nur noch **eine** Richtung (App liest, schreibt nie); Reisen gehen hoch und werden ausdrücklich geholt. Konflikte erkennt die `sha` der Contents-API — **keine** Merge-Regel, kein Zeitstempel im Datenmodell (O12, O13). `localStorage` ist jetzt ausdrücklich Arbeitskopie statt Master; der Sync blockiert nie. Neuer §4.5, FR20–FR24, F15, §9 um Geheimnis und Offline erweitert, §11 um Token, Konflikt und Veröffentlichung. O11 von „Schutz erübrigt sich" auf „privates Repo" korrigiert. Der Secret-Gist-Weg und ein API-Proxy sind als verworfen dokumentiert. Tests: erfundener Fixture-Katalog im öffentlichen Repo, der echte Katalog wird zusätzlich getestet, wenn er lokal liegt |
 | 1.6 | 2026-10-08 | Tags aufgeräumt. Neuer Tag **`UW-Fotografie`** in Anhang B.2 (Gruppe **Aktivität**): Unterwasser-Foto-Gerät (Gehäuse, Box, Auftriebskörper, Glasfaserkabel, Kleinteile, UW-Kamera, Ladegerät) hing an `Tauchen`, während Kamera und Zubehör an `Fotografie` hingen — auf einer Tauchreise kam so das Gehäuse ohne Kamera mit. Jetzt trägt das reine UW-Gerät nur `UW-Fotografie`; Kamera, SD Karte, Festplatte, Blitz, Arme, Diffusor, Fisheye, Schellen, GoPro und das Ladegerät der Kamera tragen beides und kommen auf Land- wie UW-Fotoreisen. `Flugzeug` war mit einem einzigen Item leer: `Nackenkissen` und ein Beutel (**Allgemein** weg, sie kommen nur auf Flugreisen mit), `Wollsocken` und `Sonnencreme` tragen es zusätzlich (PRD §4.3, §5.2). `Handtuch` verliert `Allgemein` (schickte es auch ins Hotel, das laut B.2 keins braucht) und hängt jetzt an `Strand`/`Camping`/`Ferienwohnung`/`Hostel`. `Ohrstöpsel` von `Allgemein` auf `Hostel`/`Camping`. Wirkungslose Doppel-Tags entfernt, wo `Allgemein` schon alles abdeckt (`Hausschuhe`, `Taschentücher`, `Wasserbehälter`). `Poncho` zusätzlich an `Strand`. Die fünf Kleidungsstücke mit `Tauchen` bleiben als Trocki-Unterzeug — PRD §6.2 verlangt hier bewusst Handarbeit, kein Automatismus |

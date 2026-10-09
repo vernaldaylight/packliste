@@ -64,12 +64,38 @@ zusätzlich die Tests gegen den echten Katalog; fehlt er, überspringen die sich
 tripTags = {saison} ∪ aktivitaeten ∪ {verkehrsmittel} ∪ {unterkunft}
            ∪ zusatz_tags ∪ {"Allgemein"}   \ entfernte_tags
 
+mit Person:
+tripTagsFuerPerson = tripTags(reise) ∪ teilnehmer.aktivitaeten ∪ {Geschlechtstag}
+
 Item überspringen, wenn nicht_mit ∩ tripTags ≠ ∅
 Item aufnehmen,   wenn tags      ∩ tripTags ≠ ∅
 ```
 
-`Allgemein` ist implizit in jeder Reise. Verkehrsmittel und Unterkunft sind keine
-Sonderfälle, sondern Tag-Quellen — es gibt kein Regelwerk und keine Warnungen.
+`Allgemein` ist implizit in jeder Reise und lässt sich nicht abwählen.
+Verkehrsmittel und Unterkunft sind keine Sonderfälle, sondern Tag-Quellen — es gibt
+kein Regelwerk und keine Warnungen.
+
+**Personen** (PRD §4.6): `personen` ist ein globales Register, `reise.teilnehmer`
+verweist darauf, und eine Reise mit zwei Teilnehmern ergibt zwei Packlisten mit
+getrenntem Fortschritt. Der Schlüssel einer Liste ist das Paar
+`(reise_id, person_id)`; `person_id: null` ist der Altbestand.
+
+Geschlechtsspezifische Items tragen das **andere** Geschlecht als Ausschluss, nicht
+das eigene als Tag:
+
+```
+Binden   { tags: ["Allgemein"],        nicht_mit: ["Herren"] }
+Badehose { tags: ["Sommer", "Strand"], nicht_mit: ["Damen"]  }
+```
+
+Der Grund: die Auswahl ist eine Oder-Verknüpfung. Ein positives `Herren` an der
+Badehose machte sie auf jeder Reise des Mannes mit — auch im Winterstädtetrip; ein
+`Herren` neben `Sommer` machte sie im Sommer bei allen mit. Als Ausschluss bleibt
+„nur für ihn" mit „nur im Sommer" verträglich. **Ein Geschlecht gehört im Katalog
+immer in `nicht_mit`, nie in `tags`.**
+
+Personen-Tags sind kein Reise-Kontext und stehen deshalb nicht in `TAG_GRUPPEN` —
+sie tauchen in keinem Chip und keiner Vorschlagsliste des Reise-Formulars auf.
 
 ## Mengen
 
@@ -118,7 +144,14 @@ bleibt stehen.
 
 **4 · Erste Füllung** — `katalog.json` ins Daten-Repo legen und committen, dann in
 der App *Katalog & Daten → Aus GitHub holen*. `reisen.json` wird nicht vorab
-angelegt: der erste „Hochschieben"-Klick erzeugt sie.
+angelegt: der erste „Hochschieben"-Klick erzeugt sie. Sie trägt seit dem
+Personen-Feature `{version: 2, personen, reisen, packlisten}`; ein alter Stand mit
+`version: 1` bleibt lesbar und wird beim Schreiben aufgefüllt.
+
+> **Ein Feld kommt nur an einer Stelle dazu.** Wer einen Reise-Datensatz von Hand
+> zusammenbaut (`{version, reisen, packlisten}`), vergisst das nächste Feld — genau
+> das ist `personen` dreimal passiert. Alles läuft deshalb durch
+> `normalisiereDaten` in `store.js`.
 
 ### Was die drei Knöpfe tun
 
@@ -126,7 +159,7 @@ angelegt: der erste „Hochschieben"-Klick erzeugt sie.
 |---|---|
 | **Katalog holen** | Lädt `katalog.json`, prüft ihn und übernimmt ihn erst dann. Ein unbrauchbarer Stand drüben lässt den hiesigen unangetastet |
 | **Hochschieben** | Liest vorher die `sha`, schreibt dann mit ihr. Liegt drüben inzwischen etwas anderes, wird **nichts** geschrieben und der Konflikt gemeldet |
-| **Holen** | Führt über die `id` zusammen: gleiche Reise wird ersetzt, neue kommen dazu, hiesige bleiben |
+| **Holen** | Führt über die `id` zusammen: gleiche Reise wird ersetzt, neue kommen dazu, hiesige bleiben. Bei Packlisten ist der Schlüssel das Paar `(reise_id, person_id)` — zwei Personen derselben Reise bleiben zwei Listen |
 
 Der Katalog geht nur **eine** Richtung — die App schreibt ihn nie. Er wird am Mac
 bearbeitet; damit schrumpft die Schreibfläche des Tokens auf `reisen.json`.
