@@ -337,37 +337,38 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
 
       // Nur die Aktivitäten, die diese Person von der Reise unterscheiden.
       const eigene = t.aktivitaeten.filter((a) => !AKTIVITAETEN.includes(a));
+
+      // Die Reiseapotheke gehört seit 1.14 zur Person (PRD §4.6). Sie steht am
+      // Ende derselben Reihe wie die Aktivitäten — dort steht alles, was nur
+      // diese Person betrifft. Sie ist aber **keine** Aktivität: der Schalter
+      // legt `t.reiseapotheke` um und kommt damit zu den Reise-Tags dieser
+      // Person dazu, statt in ihrer Aktivitätenliste zu landen.
+      const apotheke = h(
+        'button',
+        {
+          type: 'button',
+          class: `chip chip-schalter${t.reiseapotheke ? ' ist-an' : ''}`,
+          'aria-pressed': String(Boolean(t.reiseapotheke)),
+          onclick: () => {
+            t.reiseapotheke = !t.reiseapotheke;
+            aktualisiere();
+          },
+        },
+        REISEAPOTHEKE_TAG
+      );
+
       const aktivitaeten = h('div', { class: 'tag-reihe' });
       mehrereAus(() => t.aktivitaeten, (v) => (t.aktivitaeten = v), aktivitaeten, AKTIVITAETEN, {
-        zusatzChips: eigene.map((a) =>
-          entfernbarerChip(a, () => {
-            t.aktivitaeten = t.aktivitaeten.filter((x) => x !== a);
-            aktualisiere();
-          })
-        ),
-      });
-
-      // Die Reiseapotheke gehört seit 1.14 zur Person (PRD §4.6) — sie steht
-      // deshalb in einer eigenen Zeile und nicht bei den Aktivitäten: sie ist
-      // keine. Der Schalter kommt zu den Reise-Tags dieser Person dazu.
-      const apotheke = h(
-        'div',
-        { class: 'tag-reihe' },
-        h('span', { class: 'klein' }, `${REISEAPOTHEKE_TAG}:`),
-        h(
-          'button',
-          {
-            type: 'button',
-            class: `chip chip-schalter${t.reiseapotheke ? ' ist-an' : ''}`,
-            'aria-pressed': String(Boolean(t.reiseapotheke)),
-            onclick: () => {
-              t.reiseapotheke = !t.reiseapotheke;
+        zusatzChips: [
+          ...eigene.map((a) =>
+            entfernbarerChip(a, () => {
+              t.aktivitaeten = t.aktivitaeten.filter((x) => x !== a);
               aktualisiere();
-            },
-          },
-          REISEAPOTHEKE_TAG
-        )
-      );
+            })
+          ),
+          apotheke,
+        ],
+      });
 
       return h(
         'div',
@@ -406,8 +407,7 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
           { class: 'tag-reihe' },
           h('span', { class: 'klein' }, person.name ? `Zusätzlich für ${person.name}:` : 'Zusätzlich:'),
           aktivitaeten
-        ),
-        apotheke
+        )
       );
     });
 

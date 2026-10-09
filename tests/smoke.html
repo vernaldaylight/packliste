@@ -227,8 +227,8 @@
         // „Neue Person …".
         pruefe('kein „null" im Formular', !/\b(null|undefined)\b/.test(app.textContent));
 
-        // Mit Teilnehmern wechselt die Apotheke die Seite: aus „Basis" heraus in
-        // jede Personenzeile — je Person ein eigener Schalter (1.14).
+        // Mit Teilnehmern wechselt die Apotheke die Seite: aus „Basis" heraus zu
+        // jeder Person — je Person ein eigener Schalter (1.14).
         pruefe('mit Personen: kein Apotheken-Schalter in „Basis"', !basisChips().includes('Reiseapotheke'));
         const apothekeIn = (name) => {
           const zeile = [...app.querySelectorAll('.person-zeile')].find(
@@ -237,6 +237,19 @@
           return [...zeile.querySelectorAll('.chip-schalter')].find((c) => c.textContent === 'Reiseapotheke');
         };
         pruefe('jede Personenzeile hat den Apotheken-Schalter', Boolean(apothekeIn('Anna')) && Boolean(apothekeIn('Ben')));
+
+        // Und zwar in der Reihe „Zusätzlich für …": dort steht alles, was nur
+        // diese Person betrifft. Eine eigene Zeile darunter hatten wir zwischen-
+        // zeitlich — sie war nicht zu finden (Nutzerhinweis).
+        const zusatzReihe = (name) => {
+          const zeile = [...app.querySelectorAll('.person-zeile')].find(
+            (z) => z.querySelector('input[type=text]')?.value === name
+          );
+          return [...zeile.querySelectorAll('.tag-reihe')].find((r) =>
+            [...r.children].some((k) => k.matches('span.klein') && k.textContent.startsWith('Zusätzlich'))
+          );
+        };
+        pruefe('er steht in der Reihe „Zusätzlich für …"', zusatzReihe('Anna')?.contains(apothekeIn('Anna')) === true);
         pruefe('sie ist zunächst aus', !apothekeIn('Anna').classList.contains('ist-an'));
 
         apothekeIn('Anna').click();
