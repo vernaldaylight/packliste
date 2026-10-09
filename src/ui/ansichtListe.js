@@ -13,7 +13,7 @@
  * eigenen Häkchen.
  */
 
-import { h, karte, meldung, fmtZeitraum } from './dom.js';
+import { h, karte, meldung, fmtZeitraum, fmtFortschritt } from './dom.js';
 import {
   gruppiere,
   fortschritt,
@@ -23,7 +23,10 @@ import {
   erzeugePackliste,
   neuePosition,
 } from '../engine.js';
-import { inZwischenablage, zeitstempel, findePackliste } from '../store.js';
+import { inZwischenablage, teileDatei, zeitstempel, findePackliste } from '../store.js';
+
+/** So viele Suchtreffer werden angeboten — mehr braucht das Hinzufügen nicht. */
+const MAX_TREFFER = 40;
 
 export function ansichtListe({ katalog, daten, aktionen, reiseId, personId = null }) {
   const reise = daten.reisen.find((r) => r.id === reiseId) ?? null;
@@ -150,7 +153,7 @@ export function ansichtListe({ katalog, daten, aktionen, reiseId, personId = nul
         h(
           'p',
           { class: 'klein' },
-          s.gesamt === 0 ? 'Keine Position auf der Liste.' : `${s.gepackt} von ${s.gesamt} gepackt · ${Math.round(s.anteil * 100)} %`
+          fmtFortschritt(s, 'Keine Position auf der Liste.')
         )
       )
     );
@@ -314,7 +317,7 @@ export function ansichtListe({ katalog, daten, aktionen, reiseId, personId = nul
    * Häkchen neu entstehen, wäre die Sucheingabe nach jedem Klick wieder leer.
    */
   function hinzufuegenKarte() {
-    const suchfeld = h('input', { type: 'text', placeholder: 'Item suchen …', class: 'suche' });
+    const suchfeld = h('input', { type: 'text', placeholder: 'Item suchen …', 'aria-label': 'Item suchen', class: 'suche' });
     // Eigene Klassen: die Trefferliste darf nicht wie die Packliste aussehen
     // und nicht mit ihr verwechselt werden.
     const treffer = h('ul', { class: 'treffer-liste' });
@@ -323,7 +326,7 @@ export function ansichtListe({ katalog, daten, aktionen, reiseId, personId = nul
       const aufDerListe = new Set(liste.positionen.map((p) => p.item_id));
       const q = suchfeld.value.trim().toLowerCase();
       const rest = katalog.items.filter((i) => !aufDerListe.has(i.id));
-      const gefiltert = (q ? rest.filter((i) => i.name.toLowerCase().includes(q)) : rest).slice(0, 40);
+      const gefiltert = (q ? rest.filter((i) => i.name.toLowerCase().includes(q)) : rest).slice(0, MAX_TREFFER);
 
       treffer.replaceChildren(
         ...(gefiltert.length === 0
@@ -381,7 +384,7 @@ export function ansichtListe({ katalog, daten, aktionen, reiseId, personId = nul
     // würden sich sonst beim Ablegen überschreiben.
     const wem = aktiv ? `-${dateinameTeil(aktiv.person.name)}` : '';
     const dateiname = `packliste-${sauber}${wem}-${zeitstempel()}.md`;
-    const ergebnis = await teileText(md, dateiname, `${reise.name}${aktiv ? ` — ${aktiv.person.name}` : ''}`, 'text/markdown');
+    const ergebnis = await teileDatei(md, dateiname, `${reise.name}${aktiv ? ` — ${aktiv.person.name}` : ''}`, 'text/markdown');
     if (ergebnis === 'geteilt' || ergebnis === 'heruntergeladen') {
       aktionen.melde(ergebnis === 'geteilt' ? 'Markdown geteilt.' : 'Markdown als Datei gespeichert.', 'ok');
       aktionen.render();
@@ -406,24 +409,3 @@ function geschlechtText(person) {
   return person?.geschlecht ? ` · ${person.geschlecht}` : '';
 }
 
-/** Text teilen — Markdown ist kein JSON, deshalb ein eigener kleiner Weg. */
-async function teileText(inhalt, dateiname, titel, typ) {
-  const datei = new File([inhalt], dateiname, { type: typ });
-  if (navigator.canShare?.({ files: [datei] })) {
-    try {
-      await navigator.share({ files: [datei], title: titel });
-      return 'geteilt';
-    } catch (e) {
-      if (e?.name === 'AbortError') return 'abgebrochen';
-    }
-  }
-  const url = URL.createObjectURL(datei);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = dateiname;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  return 'heruntergeladen';
-}

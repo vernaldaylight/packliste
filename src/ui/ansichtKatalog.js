@@ -28,7 +28,6 @@ export function ansichtKatalog(zustand) {
   if (!katalog) return ohneKatalog(zustand);
 
   const s = katalogStatistik(katalog);
-  const gepflegt = s.regeln.fest + s.regeln.pro_tage;
   // `laden` ist das Flag aus dem Zustand, NICHT `aktionen.lade` — das ist die
   // Methode. Wer hier die Methode prüft, sperrt nie einen Knopf.
   const laeuft = Boolean(laden);
@@ -49,12 +48,12 @@ export function ansichtKatalog(zustand) {
         zeile('Items', s.items),
         zeile('Kategorien', `${s.kategorien} von ${KATEGORIEN.length}`),
         zeile('Verschiedene Tags', s.tags),
-        zeile('Mengenregeln', `${s.regeln.einmal}× einmal · ${gepflegt}× gepflegt`)
+        zeile('Mengenregeln', `${s.regeln.einmal}× einmal · ${s.gepflegt}× gepflegt`)
       ),
       h(
         'p',
         { class: 'feld-hinweis' },
-        `Katalog-Abdeckung: ${s.items === 0 ? 0 : Math.round((gepflegt / s.items) * 100)} % der Items haben eine gepflegte Mengenregel. ` +
+        `Katalog-Abdeckung: ${s.items === 0 ? 0 : Math.round((s.gepflegt / s.items) * 100)} % der Items haben eine gepflegte Mengenregel. ` +
           'Der Rest steht auf „einmal" und wird am Mac im Daten-Repo nachgezogen.'
       ),
       h('h3', { class: 'unter-titel' }, 'Verteilung'),
@@ -153,8 +152,8 @@ export function ansichtKatalog(zustand) {
           },
           'Reisen exportieren'
         ),
-        dateiWaehler('.json,application/json', (d) => importiereReisen(d, aktionen, false), 'Reisen ergänzen …'),
-        dateiWaehler('.json,application/json', (d) => importiereReisen(d, aktionen, true), 'Bestand ersetzen …')
+        dateiWaehler('.json,application/json', (d) => importiereReisen(d, aktionen, daten, false), 'Reisen ergänzen …'),
+        dateiWaehler('.json,application/json', (d) => importiereReisen(d, aktionen, daten, true), 'Bestand ersetzen …')
       ),
       h('p', { class: 'feld-hinweis' }, 'Exportieren legt eine Datei ab und ändert hier nichts. „Ergänzen" liest eine Datei ein und fügt Neues hinzu. „Ersetzen" wirft den hiesigen Bestand weg und nimmt nur, was in der Datei steht.'),
       datenBackupVorhanden()
@@ -167,11 +166,17 @@ export function ansichtKatalog(zustand) {
               {
                 class: 'knopf knopf-leise',
                 onclick: () => {
-                  const roh = localStorage.getItem('packliste.reisen.backup');
-                  if (!roh) return;
                   if (!confirm('Letzte Fassung wiederherstellen? Der jetzige Stand wird davor gesichert.')) return;
-                  localStorage.setItem('packliste.reisen', roh);
-                  aktionen.setzeDaten(JSON.parse(roh));
+                  try {
+                    const roh = localStorage.getItem('packliste.reisen.backup');
+                    if (!roh) return;
+                    // `setzeDaten` schreibt selbst — inklusive Backup des
+                    // jetzigen Standes, wie es der Text oben verspricht.
+                    aktionen.setzeDaten(JSON.parse(roh));
+                  } catch {
+                    aktionen.melde('Die Kopie ließ sich nicht wiederherstellen.', 'fehler');
+                    return aktionen.render();
+                  }
                   aktionen.melde('Letzte Fassung wiederhergestellt.', 'ok');
                   aktionen.render();
                 },

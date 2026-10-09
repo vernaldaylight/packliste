@@ -42,7 +42,7 @@ export const KATEGORIEN = [
  * Datenmodell nicht.
  *
  * Diese Liste ist das Vokabular: sie bestimmt, was im Formular wählbar ist.
- * `Auto`, `Zug` und `Freunde` sind in 1.11 entfallen — kein Item trug sie.
+ * `Auto`, `Zug` und `Freunde` sind in 1.13 entfallen — kein Item trug sie.
  */
 export const TAG_GRUPPEN = [
   { gruppe: 'Basis', tags: ['Allgemein', 'Reiseapotheke'] },
@@ -97,10 +97,7 @@ export const SAISONS = TAG_GRUPPEN.find((g) => g.gruppe === 'Klima / Saison').ta
 export const VERKEHRSMITTEL = TAG_GRUPPEN.find((g) => g.gruppe === 'Verkehrsmittel').tags;
 export const UNTERKUNFT = TAG_GRUPPEN.find((g) => g.gruppe === 'Unterkunft').tags;
 
-/**
- * Aktivitäten ohne die Unterkunft-Tags — die stehen im Formular in einem
- * eigenen Feld und dürfen dort nicht doppelt als Vorschlag auftauchen.
- */
+/** Die Aktivitäten aus dem Vokabular — das Formular baut daraus seine Schalter. */
 export const AKTIVITAETEN = TAG_GRUPPEN.find((g) => g.gruppe === 'Aktivität').tags;
 
 /**
@@ -146,7 +143,14 @@ function tagAlsZahl(iso) {
   if (!m) return null;
   const [, j, mo, t] = m;
   const ms = Date.UTC(Number(j), Number(mo) - 1, Number(t));
-  return Number.isNaN(ms) ? null : ms;
+  if (Number.isNaN(ms)) return null;
+  // Date.UTC rollt ungültige Tage still über ("2024-02-31" wird der 2. März),
+  // die Regex sieht nur die Ziffernform. Deshalb zurückrechnen und vergleichen.
+  const d = new Date(ms);
+  if (d.getUTCFullYear() !== Number(j) || d.getUTCMonth() !== Number(mo) - 1 || d.getUTCDate() !== Number(t)) {
+    return null;
+  }
+  return ms;
 }
 
 /* --- Mengenregel (PRD §4.2) ------------------------------------------------ */
@@ -185,22 +189,6 @@ export function mengeFuer(regel, tage) {
   }
 }
 
-/** Kurzbeschreibung einer Mengenregel für die Katalogansicht. */
-export function regelText(regel) {
-  switch (regel?.art) {
-    case 'fest':
-      return `${regel.n}×`;
-    case 'pro_tage': {
-      const teile = [`${regel.n} pro ${regel.pro_tage} Tage`];
-      if (Number.isFinite(regel.max) && regel.max > 0) teile.push(`max ${regel.max}`);
-      return teile.join(', ');
-    }
-    case 'einmal':
-      return 'einmal';
-    default:
-      return '—';
-  }
-}
 
 /* --- Tag-Ableitung (PRD §4.3) ---------------------------------------------- */
 
@@ -234,11 +222,7 @@ export function saisonListe(wert) {
  */
 export function tripTags(reise) {
   const tags = new Set([BASIS_TAG]);
-
-  for (const t of saisonListe(reise?.saison)) tags.add(t);
-  for (const t of reise?.aktivitaeten ?? []) if (t) tags.add(t);
-  if (reise?.verkehrsmittel) tags.add(reise.verkehrsmittel);
-  if (reise?.unterkunft) tags.add(reise.unterkunft);
+  for (const t of festeTags(reise)) tags.add(t);
   for (const t of reise?.zusatz_tags ?? []) if (t) tags.add(t);
 
   // `Allgemein` ist nicht abwählbar: es bleibt, auch wenn es in entfernte_tags steht.
@@ -248,18 +232,25 @@ export function tripTags(reise) {
 }
 
 /**
+ * Die Tags aus den festen Feldern des Formulars — ohne `zusatz_tags`, ohne
+ * `entfernte_tags` und ohne `Allgemein`. Beidesmal dieselben vier Felder, also
+ * an einer Stelle: hier.
+ */
+function festeTags(reise) {
+  const tags = new Set(saisonListe(reise?.saison));
+  for (const t of reise?.aktivitaeten ?? []) if (t) tags.add(t);
+  if (reise?.verkehrsmittel) tags.add(reise.verkehrsmittel);
+  if (reise?.unterkunft) tags.add(reise.unterkunft);
+  return tags;
+}
+
+/**
  * Die Tags, die das Formular als "abgeleitet" anzeigt: alles aus den festen
  * Feldern, ohne die Zusatz-Tags. Nur diese lassen sich streichen — die
  * Zusatz-Tags entfernt man, indem man sie löscht.
  */
 export function abgeleiteteTags(reise) {
-  const tags = new Set();
-  for (const t of saisonListe(reise?.saison)) tags.add(t);
-  for (const t of reise?.aktivitaeten ?? []) if (t) tags.add(t);
-  if (reise?.verkehrsmittel) tags.add(reise.verkehrsmittel);
-  if (reise?.unterkunft) tags.add(reise.unterkunft);
-  tags.add(BASIS_TAG);
-  return tags;
+  return new Set([BASIS_TAG, ...festeTags(reise)]);
 }
 
 /* --- Personen (PRD §4.6) --------------------------------------------------- */
@@ -381,6 +372,16 @@ export function neuePosition(item, tage) {
  *
  * @returns {Array<{kategorie: string, positionen: Array}>}
  */
+/**
+ * Die Reihenfolge der Kategorien nach `KATEGORIEN`. Unbekannte landen hinten —
+ * so bleibt ein neu importierter Katalog sortierbar, auch wenn er eine
+ * Kategorie mitbringt, die diese Version noch nicht kennt.
+ */
+export function rang(kategorie) {
+  const i = KATEGORIEN.indexOf(kategorie);
+  return i === -1 ? KATEGORIEN.length : i;
+}
+
 export function gruppiere(katalog, positionen) {
   const nachId = new Map((katalog?.items ?? []).map((i) => [i.id, i]));
   const eimer = new Map();
@@ -392,11 +393,6 @@ export function gruppiere(katalog, positionen) {
     if (!eimer.has(kategorie)) eimer.set(kategorie, []);
     eimer.get(kategorie).push({ ...pos, item });
   }
-
-  const rang = (k) => {
-    const i = KATEGORIEN.indexOf(k);
-    return i === -1 ? KATEGORIEN.length : i;
-  };
 
   return [...eimer.entries()]
     .sort((a, b) => rang(a[0]) - rang(b[0]) || a[0].localeCompare(b[0], 'de'))
@@ -460,6 +456,12 @@ export function alsMarkdown(katalog, reise, positionen, nurUngepackte = false, p
     zeilen.push('');
   }
 
-  if (leer) zeilen.push('_Nichts zu packen — keine Position auf der Liste._', '');
+  if (leer) {
+    // Zwei verschiedene Fälle: gar keine Position — oder alles schon gepackt.
+    // Der zweite darf nicht wie der erste klingen, sonst liest der Export
+    // nach getaner Arbeit wie eine leere Liste.
+    const nichtsDa = gruppen.every((g) => g.positionen.length === 0);
+    zeilen.push(nichtsDa ? '_Nichts zu packen — keine Position auf der Liste._' : '_Alles gepackt — keine offene Position._', '');
+  }
   return zeilen.join('\n');
 }

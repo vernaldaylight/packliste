@@ -64,21 +64,6 @@ export function feld(beschriftung, eingabe, hinweis) {
   );
 }
 
-/**
- * Ein `<select>` aus einer Liste. `vorschlaege` füllt zusätzlich eine
- * datalist — damit ist die Auswahl eine Vorschlagsliste plus Freitext (US-03),
- * ohne dass man einen Wert eintippen muss, den es schon gibt.
- */
-export function auswahl(name, optionen, aktuell, attrs = {}) {
-  return h(
-    'select',
-    { name, ...attrs },
-    ...optionen.map((o) =>
-      h('option', { value: typeof o === 'string' ? o : o.wert, selected: (typeof o === 'string' ? o : o.wert) === aktuell },
-        typeof o === 'string' ? o : o.text)
-    )
-  );
-}
 
 /**
  * Ein Knopf, der die Dateiauswahl öffnet (US-09).
@@ -107,9 +92,12 @@ export function meldung(text, art = 'info') {
   return h('div', { class: `meldung meldung-${art}`, role: art === 'fehler' ? 'alert' : 'status' }, text);
 }
 
+/** Wie viele Fehlerzeilen eine Meldung zeigt, bevor sie abkürzt. */
+const MAX_FEHLER = 8;
+
 /** Eine Fehlerliste, wie sie die Validierung liefert (US-09). */
 export function fehlerListe(fehler) {
-  const sichtbar = fehler.slice(0, 8);
+  const sichtbar = fehler.slice(0, MAX_FEHLER);
   return h(
     'div',
     { class: 'meldung meldung-fehler', role: 'alert' },
@@ -124,7 +112,7 @@ export function fehlerListe(fehler) {
 /* --- Formatierung (UI ist komplett deutsch, PRD §9) ------------------------ */
 
 /** '2026-08-01' -> '01.08.2026' */
-export function fmtDatum(iso) {
+function fmtDatum(iso) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso ?? ''));
   return m ? `${m[3]}.${m[2]}.${m[1]}` : '';
 }
@@ -135,4 +123,17 @@ export function fmtZeitraum(von, bis, tage) {
   const b = fmtDatum(bis);
   const zeitraum = a && b ? `${a} – ${b}` : a || b || 'kein Zeitraum';
   return tage > 0 ? `${zeitraum} · ${tage} ${tage === 1 ? 'Tag' : 'Tage'}` : zeitraum;
+}
+
+/**
+ * „4 von 12 gepackt · 33 %" aus `fortschritt()` (engine.js).
+ *
+ * `leer` ist der Text für den Fall, dass die Liste gar keine Position hat. Die
+ * Übersicht lässt ihn weg und schreibt „0 von 0 gepackt" — dort steht direkt
+ * darüber schon, dass es noch keine Liste gibt. Die Listenansicht setzt ihn.
+ */
+export function fmtFortschritt(s, leer = null) {
+  if (s.gesamt === 0 && leer) return leer;
+  const prozent = s.gesamt > 0 ? ` · ${Math.round(s.anteil * 100)} %` : '';
+  return `${s.gepackt} von ${s.gesamt} gepackt${prozent}`;
 }

@@ -251,9 +251,10 @@ test('vor jedem Schreiben liegt die Vorgängerversion im Backup', () => {
   assert.equal(ladeDaten().reisen.length, 2);
 });
 
-test('ein gesperrter Speicher wirft mit einem verständlichen Satz', () => {
+test('ein gesperrter Speicher wird als false gemeldet, nicht als Absturz', () => {
   globalThis.localStorage = baueSpeicher({ voll: true });
-  assert.throws(() => speichereDaten(leereDaten()), /Speicher des Browsers ist voll/);
+  assert.equal(speichereDaten(leereDaten()), false, 'die UI zeigt daraufhin einen Hinweis');
+  assert.equal(localStorage.getItem(SCHLUESSEL.daten), null, 'und es wurde nichts halb geschrieben');
 });
 
 test('kaputte gespeicherte Daten werden als leerer Bestand behandelt', () => {

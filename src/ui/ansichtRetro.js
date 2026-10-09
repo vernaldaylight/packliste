@@ -32,15 +32,22 @@ export function ansichtRetro({ daten, aktionen, reiseId }) {
   const feld = h('textarea', {
     class: 'retro-text',
     rows: '8',
+    'aria-label': 'Was hat gefehlt?',
     placeholder: 'z. B. Blasenpflaster gefehlt — die Wanderung war länger als geplant.',
     oninput: (e) => (text = e.target.value),
   });
   feld.value = text;
 
+  /**
+   * `zurueck === null` heißt „hier bleiben". Das ist kein Pfad, sondern ein
+   * Neuzeichnen: `gehe('/')` würde die Retro-Ansicht verlassen, obwohl der
+   * Knopf das Gegenteil verspricht.
+   */
   function speichern(zurueck) {
     aktionen.aktualisiereReise(reise.id, { retro: text.trim() });
     aktionen.melde(`Retro zu „${reise.name}" gespeichert.`, 'ok');
-    aktionen.gehe(zurueck ?? '/');
+    if (zurueck === null) aktionen.render();
+    else aktionen.gehe(zurueck);
   }
 
   const itemVorlage = JSON.stringify(

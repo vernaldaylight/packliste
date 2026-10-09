@@ -23,7 +23,6 @@ import {
   loescheToken,
   tokenHinterlegt,
   speichereKatalog,
-  speichereSyncStand,
   fuegeReisenZusammen,
 } from '../store.js';
 import { erstelleSync, holeKatalog, holeReisen, schiebeReisen } from '../sync.js';
@@ -68,9 +67,10 @@ export async function zieheKatalog(aktionen) {
     const r = await holeKatalog({ sync: netz(), ...konf });
     if (!r.ok) return meldeFehler(aktionen, r, 'Katalog holen');
 
-    speichereKatalog(r.katalog);
+    if (!speichereKatalog(r.katalog)) {
+      return aktionen.melde('Der Katalog konnte nicht gespeichert werden — der Speicher des Browsers ist voll oder gesperrt.', 'fehler');
+    }
     aktionen.setzeKatalog(r.katalog);
-    speichereSyncStand('katalog', { sha: r.sha, geholt_am: new Date().toISOString() });
     aktionen.melde(`Katalog geholt: ${r.statistik.items} Items, ${r.statistik.kategorien} Kategorien.`, 'ok');
   });
 }
@@ -118,7 +118,6 @@ export async function schiebeReisenStand(aktionen, daten, { erzwingen = false } 
 
     const r = await schiebeReisen({ sync: netz(), ...konf, daten, sha });
     if (r.ok) {
-      speichereSyncStand('reisen', { sha: r.sha, geholt_am: new Date().toISOString() });
       aktionen.melde(`Hochgeschoben: ${daten.reisen.length} Reisen, ${daten.packlisten.length} Packlisten.`, 'ok');
       return;
     }
@@ -149,7 +148,6 @@ export async function zieheReisen(aktionen, daten) {
 
     const { daten: zusammen, dazu } = fuegeReisenZusammen(daten, r.daten);
     aktionen.setzeDaten(zusammen);
-    speichereSyncStand('reisen', { sha: r.sha, geholt_am: new Date().toISOString() });
     aktionen.melde(
       dazu === 0
         ? `Geholt: ${r.daten.reisen.length} Reisen — nichts Neues dabei.`
@@ -162,14 +160,14 @@ export async function zieheReisen(aktionen, daten) {
 /* --- Der Konfliktfall ------------------------------------------------------ */
 
 /** Von drüben holen — der hiesige Stand wird dabei zusammengeführt, nicht ersetzt. */
-export async function konfliktHolen(aktionen, daten) {
+async function konfliktHolen(aktionen, daten) {
   aktionen.verwerfeKonflikt();
   aktionen.render();
   await zieheReisen(aktionen, daten);
 }
 
 /** Meinen Stand durchsetzen. Bewusst mit frischer `sha` — die Entscheidung ist gefallen. */
-export async function konfliktSchieben(aktionen, daten) {
+async function konfliktSchieben(aktionen, daten) {
   aktionen.verwerfeKonflikt();
   aktionen.render();
   await schiebeReisenStand(aktionen, daten, { erzwingen: true });

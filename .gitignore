@@ -12,3 +12,6 @@
 node_modules/
 dist/
 .vercel/
+
+# gstack-Arbeitsdateien (lokale Logs, Sitzungszustand)
+.gstack/

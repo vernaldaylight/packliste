@@ -250,6 +250,16 @@ code {
   background: transparent;
 }
 
+/* Der gedrückte Zustand eines Umschaltknopfs (z.B. "nur Ungepackte"). Die
+   :hover-Regel oben ist spezifischer, deshalb hier ausdrücklich wiederholt. */
+.knopf.ist-an,
+.knopf.ist-an:hover:not(:disabled) {
+  background: var(--akzent);
+  border-color: var(--akzent);
+  color: var(--akzent-text);
+  font-weight: 600;
+}
+
 .knopf-reihe {
   display: flex;
   gap: 8px;
@@ -717,6 +727,15 @@ input.menge {
 .meldung-ok {
   border-color: var(--ok);
   color: var(--ok);
+}
+
+/* `meldung()` hat 'info' als Vorgabe — ohne eigene Regel bliebe das farblos.
+   Bewusst neutral: Textfarbe bleibt die normale, nur der Rand trägt den Akzent.
+   Sonst wäre die Info-Meldung nicht von der Erfolgsmeldung zu unterscheiden,
+   deren Grün dieselbe Farbe ist. */
+.meldung-info {
+  border-color: var(--rand);
+  border-left: 3px solid var(--akzent);
 }
 
 .meldung-fehler {

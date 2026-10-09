@@ -33,17 +33,16 @@ export async function importiereKatalog(datei, aktionen) {
   aktionen.setzeKatalog(geprueft.katalog);
 
   const s = geprueft.statistik;
-  const gepflegt = s.regeln.fest + s.regeln.pro_tage;
   aktionen.melde(
     `Katalog übernommen: ${s.items} Items, ${s.kategorien} Kategorien, ${s.tags} Tags. ` +
-      `Mengenregeln: ${s.regeln.einmal}× einmal, ${gepflegt}× gepflegt (fest/pro Tag).`,
+      `Mengenregeln: ${s.regeln.einmal}× einmal, ${s.gepflegt}× gepflegt (fest/pro Tag).`,
     'ok'
   );
   aktionen.render();
 }
 
 /** Prüft und übernimmt eine Reise-Datei (Rückweg von US-10). */
-export async function importiereReisen(datei, aktionen, ersetzen) {
+export async function importiereReisen(datei, aktionen, daten, ersetzen) {
   const gelesen = await leseJsonDatei(datei);
   if (!gelesen.ok) {
     aktionen.melde(gelesen.fehler[0], 'fehler');
@@ -69,9 +68,9 @@ export async function importiereReisen(datei, aktionen, ersetzen) {
   } else {
     // Zusammenführen über die `id` — dieselbe Regel wie beim Sync (PRD §3.4,
     // §4.5), deshalb liegt sie in store.js und nicht hier.
-    const { daten, dazu } = fuegeReisenZusammen(aktionen.daten, geprueft.daten);
-    aktionen.setzeDaten(daten);
-    aktionen.melde(`${neu} Reisen gelesen, davon ${dazu} neu.`, 'ok');
+    const zusammengefuehrt = fuegeReisenZusammen(daten, geprueft.daten);
+    aktionen.setzeDaten(zusammengefuehrt.daten);
+    aktionen.melde(`${neu} Reisen gelesen, davon ${zusammengefuehrt.dazu} neu.`, 'ok');
   }
   aktionen.render();
 }
