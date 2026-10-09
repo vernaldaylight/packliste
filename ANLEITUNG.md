@@ -162,7 +162,7 @@ Taschen & Ordnung        Verpflegung     Haushalt & Sonstiges
 | Basis | `Allgemein`, `Reiseapotheke` |
 | Klima / Saison | `Winter`, `Sommer`, `Übergangszeit`, `Regen` |
 | Verkehrsmittel | `Flugzeug`, `Auto`, `Zug` |
-| Aktivität | `Tauchen`, `Festival`, `Wandern`, `Strand`, `Ski`, `Städtetrip`, `Arbeit`, `Fotografie`, `UW-Fotografie` |
+| Aktivität | `Tauchen`, `Festival`, `Wandern`, `Strand`, `Ski`, `Arbeit`, `Fotografie`, `UW-Fotografie` |
 | Unterkunft | `Camping`, `Ferienwohnung`, `Hotel`, `Hostel`, `Freunde` |
 | Person | `Damen`, `Herren` — **nur** in `nicht_mit`, siehe unten |
 

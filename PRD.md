@@ -1,7 +1,7 @@
 # Packliste — Product Requirements Document
 
-**Version**: 1.9
-**Datum**: 2026-10-08
+**Version**: 1.10
+**Datum**: 2026-10-09
 **Autor**: Sarah
 **Status**: Abgestimmt — bereit für die Umsetzung. Technische Architektur entschieden (§3.6). Der Katalog-Editor ist aus dem MVP in die erste Überarbeitung verschoben (FF-16).
 **Sprache der App**: Deutsch
@@ -410,7 +410,7 @@ Item "Bikini"   { tags: ["Sommer", "Strand"],     nicht_mit: ["Herren"] }
 Item "Badehose" { tags: ["Sommer", "Strand"],     nicht_mit: ["Damen"]  }
 ```
 
-Das ist nicht Geschmack, sondern Notwendigkeit — die andere Schreibweise ist kaputt. Trüge `Badehose` stattdessen `tags: ["Herren"]`, wäre sie auf **jeder** Reise des Mannes dabei, auch auf dem Winter-Städtetrip. Trüge sie `["Sommer", "Strand", "Herren"]`, wäre sie im Sommer bei **allen** dabei, auch bei der Frau: die Auswahl ist eine Oder-Verknüpfung über die Tags, ein „Herren **und** Sommer" lässt sich darin nicht ausdrücken.
+Das ist nicht Geschmack, sondern Notwendigkeit — die andere Schreibweise ist kaputt. Trüge `Badehose` stattdessen `tags: ["Herren"]`, wäre sie auf **jeder** Reise des Mannes dabei, auch auf der Winterreise. Trüge sie `["Sommer", "Strand", "Herren"]`, wäre sie im Sommer bei **allen** dabei, auch bei der Frau: die Auswahl ist eine Oder-Verknüpfung über die Tags, ein „Herren **und** Sommer" lässt sich darin nicht ausdrücken.
 
 Der Ausschluss dagegen kombiniert sich sauber mit allem anderen: `nicht_mit` hat Vorrang vor den positiven Tags (§5.3), also bleibt „nur für ihn" mit „nur im Sommer" verträglich. Möglich ist das, weil das Geschlechts-Tag der Person im Tag-Satz liegt — für Ben greift `nicht_mit: ["Herren"]`, für Anna nicht.
 
@@ -441,10 +441,12 @@ Die letzten beiden Zeilen zeigen, warum Verkehrsmittel-als-Tag besser ist als ei
 Ein Item kann Tags haben, die es **aktiv ausschließen**:
 
 ```
-Item "Badehose" { tags: ["Sommer", "Strand"], nicht_mit: ["Städtetrip"] }
+Item "Binden" { tags: ["Allgemein"], nicht_mit: ["Herren"] }
 ```
 
-**Wann das gebraucht wird**: Positive Tags reichen weiter, als es zunächst scheint. Ein Handtuch, das nur `Camping` und `Ferienwohnung` trägt, landet bei einer Hotelreise ohnehin nicht auf der Liste — es braucht kein `nicht_mit: ["Hotel"]`. Der Ausschluss wird erst gebraucht, wenn ein Item **notwendigerweise** einen breiten Tag trägt, in einer bestimmten Situation aber trotzdem nicht mitkommt. Die Badehose oben ist genau dieser Fall: `Sommer` muss sie tragen, damit sie im Sommerurlaub dabei ist — aber auf einem Städtetrip im Sommer ist sie Ballast.
+**Wann das gebraucht wird**: Positive Tags reichen weiter, als es zunächst scheint. Ein Handtuch, das nur `Camping` und `Ferienwohnung` trägt, landet bei einer Hotelreise ohnehin nicht auf der Liste — es braucht kein `nicht_mit: ["Hotel"]`. Der Ausschluss wird erst gebraucht, wenn ein Item **notwendigerweise** einen breiten Tag trägt, in einer bestimmten Situation aber trotzdem nicht mitkommt. `Binden` ist genau dieser Fall: `Allgemein` muss es tragen, damit es auf jede Reise geht — für einen Mann ist es trotzdem nichts. Dass der Ausschluss greift, liegt daran, dass das Geschlechts-Tag der Person im Tag-Satz liegt (§5.1).
+
+**Stand im Katalog**: Ausschlüsse gibt es heute nur für das Geschlecht (§5.1). Der Fall „breiter Tag, falsche Situation" kam mit dem Tag `Städtetrip` in den Katalog und ging mit ihm wieder (Version 1.10): `Badehose` war auf einem Städtetrip im Sommer Ballast, aber `Sommer` muss sie tragen. Die Regel bleibt, der Bedarf ist derzeit gedeckt.
 
 **Priorität**: P1, nicht P0. Das Feld wird im Datenmodell von Anfang an vorgesehen, damit keine Migration nötig wird; die UI dafür kommt erst, wenn der Bedarf beim Pflegen des echten Katalogs auftritt.
 
@@ -849,7 +851,7 @@ Gespeichert als flache Strings; gruppiert nur für die Darstellung im Formular.
 | **Basis** | Allgemein, Reiseapotheke | Excel + neu |
 | **Klima / Saison** | Winter, Sommer, Übergangszeit, Regen | Excel + neu (Übergangszeit, Regen) |
 | **Verkehrsmittel** | Flugzeug, Auto, Zug | neu |
-| **Aktivität** | Tauchen, Festival, Wandern, Strand, Ski, Städtetrip, Arbeit, Fotografie, UW-Fotografie | Excel + neu |
+| **Aktivität** | Tauchen, Festival, Wandern, Strand, Ski, Arbeit, Fotografie, UW-Fotografie | Excel + neu |
 | **Unterkunft** | Camping, Ferienwohnung, Hotel, Hostel, Freunde | Excel + neu |
 | **Person** | Damen, Herren — **nicht in `TAG_GRUPPEN`** | neu (§4.6) |
 
@@ -870,7 +872,6 @@ Eine **Anlass**-Gruppe entfällt ersatzlos.
 | **Wandern** | Sehr häufige Aktivität; eigene Ausrüstung (Stöcke, Blasenpflaster, Rucksack) |
 | **Strand** | Handtuch, Strandtasche, Sonnenschutz, Schnorchel — überschneidet sich mit Sommer, aber nicht deckungsgleich |
 | **Ski** | Wintersport braucht völlig eigenes Gerät; ohne diesen Tag ist `Winter` zu grob |
-| **Städtetrip** | Anderes Packverhalten als Strand oder Wandern: bequeme Schuhe, Tagesrucksack, wenig Gepäck |
 | **Arbeit** | Laptop, Businesskleidung, Adapter — eigene Anforderung |
 | **Fotografie** | Kamera, Objektive, Speicherkarten, Stativ — Fotografie **an Land** |
 | **UW-Fotografie** | Unterwasser-Fotografie. Eigener Tag, weil die Ausrüstung eine andere ist: Gehäuse, Arme, Blitz, Fiberkabel und Ladegerät der UW-Kamera kommen nur beim Tauchen mit, während Kamera und Speicherkarte auf beide Reisen gehen. Ein Item trägt daher `Fotografie`, `UW-Fotografie` oder beide |
@@ -921,6 +922,7 @@ Dabei entstehen zwei Lücken, die der Import-Report (F7) ausweisen muss:
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 1.10 | 2026-10-09 | **Tag `Städtetrip` entfällt.** Er trug genau ein Item (`Schirm`) und diente dort allein dem Ausschluss-Fall aus §5.3 — ohne ihn ist die Liste der Reise-Kontexte ehrlicher, und §5.3 zeigt sein Beispiel jetzt am Geschlecht (`Binden`), dem einzigen Ausschluss, den der Katalog heute wirklich braucht. `Devil Sticks` und `Poi` hängen nur noch an `Festival` statt an `Camping`/`Festival`: es sind Jongliergeräte, keine Zeltausrüstung. Nachtrag zu 1.9: die Geschlechts-Markierung im Katalog ist inzwischen erfolgt — 16 Items tragen `Damen` bzw. `Herren` in `nicht_mit`, die Notiz in 1.9 („steht noch aus") ist damit erledigt |
 | 1.9 | 2026-10-08 | **Personen — das Fundament für zwei Menschen auf einer Reise.** Neues globales Register `daten.personen` (`{id, name, geschlecht}`) und `reise.teilnehmer` (`{person_id, aktivitaeten}`); eine Reise mit zwei Teilnehmern ergibt **zwei** Packlisten, jede mit eigenem Fortschritt. Datenstand `version: 2`, neuer §4.6, neuer Tag-Ort `PERSON_TAGS` in Anhang B.2, O14–O16. **Der Schlüssel einer Packliste ist jetzt das Paar `(reise_id, person_id)`** — über `reise_id` allein überschriebe die zweite Person still die Liste der ersten. Alle vier Nähte, über die ein Reise-Datensatz hereinkommt (`localStorage`, Import-Datei, Sync, Ersetzen beim Import), gehen jetzt durch `normalisiereDaten`; drei davon zählten die Felder vorher selbst auf und hätten `personen` verloren. Alte Stände bleiben ohne Migration lesbar, alten Listen wird kein `person_id` angedichtet. **Geschlecht als Tag, aber in `nicht_mit`:** als positives Tag ließe sich „nur für ihn" nicht mit „nur im Sommer" kombinieren — `Badehose` wäre auf der Winterreise oder bei allen dabei (§5.1). Die Liste einer Person liegt unter `#/liste/:reiseId/:personId`, die alte Adresse bleibt gültig. Das Löschen einer Person entfernt keine Listen. FF-05/FF-06 bleiben offen und sind jetzt als solche benannt. Katalogseitig steht die Geschlechts-Markierung noch aus — bis dahin greift kein Ausschluss, und beide Geschlechter-Items kommen mit |
 | 1.8 | 2026-10-08 | **Auslieferung von Vercel auf GitHub Pages umgestellt.** Vercel lieferte unter der Projekt-Domain eine fremde Next.js-App aus, während die eigenen Deployments seit Stunden als „blocked" scheiterten — der Wirt war nicht mehr nachvollziehbar. Pages liegt im selben Repo wie der Code, das Deployment steht als Datei darin statt in einem Dashboard. Zwei Eigenheiten, die dabei zu beachten sind: Projekt-Seiten liegen unter `/packliste/`, deshalb setzt `vite.config.js` ein `base` — **nur beim Bauen**, damit Entwicklungsserver, Rauchtest und die absoluten Fixture-Pfade unverändert bleiben. Und weil die App über `location.hash` routet, braucht es keine `404.html`-Krücke für Deep-Links. Kopfzeile dieses Dokuments von 1.2 auf den Stand der Historie gezogen |
 | 1.7 | 2026-10-08 | **Zwei Repos statt einem.** Das App-Repo wird öffentlich und enthält nur noch die Hülle; Katalog und `import/` ziehen in ein **privates** Daten-Repo, weil der Katalog Gesundheitsdaten enthält (Medikamentennamen) und `mapping.json` echte Item-Namen — ein einmal veröffentlichter Stand ist nicht zurückzuholen. Datentransfer um **US-11** ergänzt: Abgleich über die GitHub-Contents-API auf Knopfdruck, fein granuliertes PAT nur im `localStorage`. Der Katalog geht nur noch **eine** Richtung (App liest, schreibt nie); Reisen gehen hoch und werden ausdrücklich geholt. Konflikte erkennt die `sha` der Contents-API — **keine** Merge-Regel, kein Zeitstempel im Datenmodell (O12, O13). `localStorage` ist jetzt ausdrücklich Arbeitskopie statt Master; der Sync blockiert nie. Neuer §4.5, FR20–FR24, F15, §9 um Geheimnis und Offline erweitert, §11 um Token, Konflikt und Veröffentlichung. O11 von „Schutz erübrigt sich" auf „privates Repo" korrigiert. Der Secret-Gist-Weg und ein API-Proxy sind als verworfen dokumentiert. Tests: erfundener Fixture-Katalog im öffentlichen Repo, der echte Katalog wird zusätzlich getestet, wenn er lokal liegt |

@@ -250,9 +250,9 @@ test('passtZuReise nimmt bei Tag-Treffer auf', () => {
 });
 
 test('nicht_mit schlägt einen positiven Tag-Treffer (PRD §5.3)', () => {
-  const badehose = { tags: ['Sommer', 'Strand'], nicht_mit: ['Städtetrip'] };
-  assert.ok(passtZuReise(badehose, new Set(['Sommer', 'Strand'])));
-  assert.ok(!passtZuReise(badehose, new Set(['Sommer', 'Städtetrip'])));
+  const binden = { tags: ['Allgemein'], nicht_mit: ['Herren'] };
+  assert.ok(passtZuReise(binden, new Set(['Allgemein', 'Damen'])));
+  assert.ok(!passtZuReise(binden, new Set(['Allgemein', 'Herren'])));
 });
 
 test('ein Item ohne Tags wird nie ausgewählt', () => {

@@ -45,7 +45,7 @@ export const TAG_GRUPPEN = [
   { gruppe: 'Verkehrsmittel', tags: ['Flugzeug', 'Auto', 'Zug'] },
   {
     gruppe: 'Aktivität',
-    tags: ['Tauchen', 'Festival', 'Wandern', 'Strand', 'Ski', 'Städtetrip', 'Arbeit', 'Fotografie', 'UW-Fotografie'],
+    tags: ['Tauchen', 'Festival', 'Wandern', 'Strand', 'Ski', 'Arbeit', 'Fotografie', 'UW-Fotografie'],
   },
   { gruppe: 'Unterkunft', tags: ['Camping', 'Ferienwohnung', 'Hotel', 'Hostel', 'Freunde'] },
 ];
