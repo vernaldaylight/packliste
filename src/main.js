@@ -5,7 +5,7 @@
  *   Start     Reiseübersicht, oder Import-Aufforderung wenn der Katalog fehlt
  *   Reise     Formular mit automatischer Tag-Ableitung
  *   Liste     das Ergebnis: gruppiert, abhakbar, nachjustierbar
- *   Katalog   importieren, Kennzahlen, sichern
+ *   Katalog   holen und importieren, Kennzahlen
  *   Retro     "Was hat gefehlt?"
  */
 
@@ -288,7 +288,7 @@ function kopfzeile() {
       'nav',
       { class: 'kopf-nav' },
       h('a', { href: '#/' }, 'Reisen'),
-      h('a', { href: '#/katalog' }, da ? `Katalog (${zustand.katalog.items.length})` : 'Katalog')
+      h('a', { href: '#/katalog' }, da ? `Daten (${zustand.katalog.items.length})` : 'Daten')
     )
   );
 }

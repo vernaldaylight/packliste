@@ -1,11 +1,13 @@
 /**
- * ansichtKatalog.js — Katalog holen und sichern, Reisen sichern (US-09, US-10).
+ * ansichtKatalog.js — Katalog holen, Reisen sichern (US-09, US-10).
  *
  * Diese Ansicht ist die einzige, die auch ohne Katalog funktioniert — sie ist
  * der Weg zurück, wenn iOS den Script-Storage geräumt hat (PRD §4.5).
  *
- * Der Katalog ist am Handy read-only: geändert wird er am Mac im Daten-Repo und
- * per Commit (PRD §3.6). Die Sync-Handgriffe liegen in `syncUi.js`.
+ * Der Katalog ist read-only: geändert wird er am Mac im Daten-Repo und
+ * per Commit (PRD §3.6, §4.5). Geholt und importiert wird er als Ganzes, und
+ * „Katalog in Datei sichern" gibt genau ihn wieder aus — ohne die Reisen. Die
+ * Sync-Handgriffe liegen in `syncUi.js`.
  */
 
 import { h, karte, dateiWaehler } from './dom.js';
@@ -70,7 +72,7 @@ export function ansichtKatalog(zustand) {
           'Aus GitHub holen'
         ),
         dateiWaehler('.json,application/json', (d) => importiereKatalog(d, aktionen), 'Anderen Katalog importieren …'),
-        h('button', { class: 'knopf', onclick: () => exportiereKatalog(katalog, aktionen) }, 'Katalog sichern'),
+        h('button', { class: 'knopf', onclick: () => exportiereKatalog(katalog, aktionen) }, 'Katalog in Datei sichern'),
         h(
           'button',
           {
@@ -94,12 +96,15 @@ export function ansichtKatalog(zustand) {
     ),
 
     karte(
-      'Reisen (US-10)',
+      'Reisen',
       h(
         'p',
         {},
-        `${daten.reisen.length} Reisen, ${daten.packlisten.length} Packlisten. Sie liegen in diesem Browser und — wenn du schiebst — im privaten Daten-Repo.`
+        'Pro Reise und Person eine Packliste. Sie liegen in diesem Browser. ' +
+          'Zwei Wege führen hinaus und wieder herein: übers Netz oder per Datei.'
       ),
+      h('h3', { class: 'unter-titel' }, 'Übers Netz'),
+      h('p', { class: 'klein' }, 'Braucht ein eingerichtetes Token.'),
       h(
         'div',
         { class: 'knopf-reihe' },
@@ -125,8 +130,8 @@ export function ansichtKatalog(zustand) {
           '„Holen" führt zusammen: gleiche Reise wird ersetzt, neue kommen dazu, hiesige bleiben.'
       ),
 
-      h('h3', { class: 'unter-titel' }, 'Ohne Netz: Datei'),
-      h('p', { class: 'klein' }, 'Beide Wege bleiben — der Sync braucht Netz, die Datei nicht.'),
+      h('h3', { class: 'unter-titel' }, 'Per Datei'),
+      h('p', { class: 'klein' }, 'Braucht weder Token noch Netz.'),
       h(
         'div',
         { class: 'knopf-reihe' },
@@ -148,15 +153,15 @@ export function ansichtKatalog(zustand) {
           },
           'Reisen exportieren'
         ),
-        dateiWaehler('.json,application/json', (d) => importiereReisen(d, aktionen, false), 'Reisen hinzufügen …'),
+        dateiWaehler('.json,application/json', (d) => importiereReisen(d, aktionen, false), 'Reisen ergänzen …'),
         dateiWaehler('.json,application/json', (d) => importiereReisen(d, aktionen, true), 'Bestand ersetzen …')
       ),
-      h('p', { class: 'feld-hinweis' }, 'Der Export verändert nichts am lokalen Bestand. „Hinzufügen" ergänzt, „Ersetzen" überschreibt.'),
+      h('p', { class: 'feld-hinweis' }, 'Exportieren legt eine Datei ab und ändert hier nichts. „Ergänzen" liest eine Datei ein und fügt Neues hinzu. „Ersetzen" wirft den hiesigen Bestand weg und nimmt nur, was in der Datei steht.'),
       datenBackupVorhanden()
         ? h(
             'p',
             { class: 'klein' },
-            'Es liegt ein automatisches Backup der letzten Fassung im Browser. ',
+            'Es liegt noch eine Kopie der Reisen von vor der letzten Änderung. ',
             h(
               'button',
               {
@@ -171,29 +176,13 @@ export function ansichtKatalog(zustand) {
                   aktionen.render();
                 },
               },
-              'wiederherstellen'
+              'Diese Kopie wiederherstellen'
             )
           )
         : null
     ),
 
-    karteSync({ aktionen, laden }),
-
-    karte(
-      'Wo der Katalog herkommt',
-      h(
-        'p',
-        {},
-        'Der Master liegt im privaten Daten-Repo, zusammen mit den Reisen. Von dort holt ihn „Aus GitHub holen". ' +
-          'Ins App-Repo und in die Deploy-URL kommt er nicht — dort liegt nur die App-Hülle und nichts Persönliches (O11).'
-      ),
-      h(
-        'p',
-        { class: 'feld-hinweis' },
-        'Katalogänderungen laufen am Mac: im Daten-Repo katalog.json bearbeiten und committen, dann hier „Aus GitHub holen". ' +
-          'Ohne Token geht es weiter per Datei — „Anderen Katalog importieren". Am Handy ist der Katalog bewusst read-only.'
-      )
-    )
+    karteSync({ aktionen, laden })
   );
 }
 
@@ -201,10 +190,15 @@ function zeile(links, rechts) {
   return h('li', {}, h('span', {}, links), h('strong', {}, String(rechts)));
 }
 
+/**
+ * Nur der Katalog, nichts sonst. `katalog` ist der eigene Zustandsteil
+ * (`main.js`) — die Reisen liegen getrennt unter `daten` und kommen hier
+ * nicht mit. Was diese Datei verlässt, ist genau katalog.json.
+ */
 async function exportiereKatalog(katalog, aktionen) {
   const ergebnis = await teileDatei(JSON.stringify(katalog, null, 2), katalogDateiname(), 'Packliste — Katalog');
   if (ergebnis === 'geteilt' || ergebnis === 'heruntergeladen') {
-    aktionen.melde(ergebnis === 'geteilt' ? 'Katalog geteilt.' : 'Katalog als Datei gespeichert.', 'ok');
+    aktionen.melde(ergebnis === 'geteilt' ? 'Katalog geteilt — nur der Katalog, ohne Reisen.' : 'Katalog als Datei gespeichert — nur der Katalog, ohne Reisen.', 'ok');
   } else if (ergebnis === 'fehler') {
     aktionen.melde('Export ging nicht.', 'fehler');
   }
