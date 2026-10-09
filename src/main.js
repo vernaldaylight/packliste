@@ -34,6 +34,12 @@ const zustand = {
   laden: null,
   /** Ein ungelöster Sync-Konflikt. Belegt die Konfliktkarte (PRD §4.5). */
   konflikt: null,
+  /**
+   * Warnt dauerhaft, wenn der Browser nichts speichern kann — und ebenso, wenn
+   * ein einzelner Schreibvorgang fehlschlägt. Bewusst nicht `blitz`: der wird
+   * von `render()` verbraucht und von der nächsten `melde()` überschrieben.
+   */
+  speicherWarnung: null,
 };
 
 /* --- Zustandshelfer -------------------------------------------------------- */
@@ -267,6 +273,7 @@ function render() {
 
   leere(wurzel);
   wurzel.append(kopfzeile());
+  if (zustand.speicherWarnung) wurzel.append(meldung(zustand.speicherWarnung, 'fehler'));
   if (zustand.laden) wurzel.append(meldung(zustand.laden, 'info'));
   if (blitz?.fehler) {
     if (blitz.titel) wurzel.append(meldung(blitz.titel, 'fehler'));
@@ -297,12 +304,10 @@ function kopfzeile() {
 
 function starte() {
   if (!speicherVerfuegbar()) {
-    wurzel.append(
-      meldung(
-        'Dieser Browser lässt die App nichts speichern (privater Modus?). Die App läuft, aber Reisen und Katalog sind nach dem Schließen weg.',
-        'fehler'
-      )
-    );
+    // Nur in den Zustand schreiben: `render()` hängt sie an, und ein direktes
+    // `append` hier wäre beim ersten `render()` gleich wieder weggeräumt.
+    zustand.speicherWarnung =
+      'Dieser Browser lässt die App nichts speichern (privater Modus?). Die App läuft, aber Reisen und Katalog sind nach dem Schließen weg.';
   }
 
   zustand.katalog = ladeKatalog();
