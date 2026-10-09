@@ -64,21 +64,6 @@ export function feld(beschriftung, eingabe, hinweis) {
   );
 }
 
-/**
- * Ein `<select>` aus einer Liste. `vorschlaege` füllt zusätzlich eine
- * datalist — damit ist die Auswahl eine Vorschlagsliste plus Freitext (US-03),
- * ohne dass man einen Wert eintippen muss, den es schon gibt.
- */
-export function auswahl(name, optionen, aktuell, attrs = {}) {
-  return h(
-    'select',
-    { name, ...attrs },
-    ...optionen.map((o) =>
-      h('option', { value: typeof o === 'string' ? o : o.wert, selected: (typeof o === 'string' ? o : o.wert) === aktuell },
-        typeof o === 'string' ? o : o.text)
-    )
-  );
-}
 
 /**
  * Ein Knopf, der die Dateiauswahl öffnet (US-09).
@@ -124,7 +109,7 @@ export function fehlerListe(fehler) {
 /* --- Formatierung (UI ist komplett deutsch, PRD §9) ------------------------ */
 
 /** '2026-08-01' -> '01.08.2026' */
-export function fmtDatum(iso) {
+function fmtDatum(iso) {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso ?? ''));
   return m ? `${m[3]}.${m[2]}.${m[1]}` : '';
 }

@@ -20,10 +20,8 @@ export const SCHLUESSEL = {
   daten: 'packliste.reisen',
   backupKatalog: 'packliste.katalog.backup',
   backupDaten: 'packliste.reisen.backup',
-  // Synchronisierung (PRD §4.5). Getrennt in Einstellung und Zustand, damit
-  // sich das Token löschen lässt, ohne das Repo zu vergessen.
+  // Synchronisierung (PRD §4.5): Repo und Token.
   sync: 'packliste.sync',
-  syncStand: 'packliste.sync.stand',
 };
 
 /**
@@ -507,10 +505,6 @@ export function ladeSync() {
 /**
  * Schreibt die Einstellung. Ein fehlendes `token` (undefined) lässt das
  * hinterlegte stehen — sonst würde ein reines Repo-Speichern das Token löschen.
- *
- * Weil der gemerkte `sha` zu einem Repo gehört, wird er hier verworfen: nach
- * einem Repo-Wechsel wäre er falsch und ein gewöhnlicher Push sähe wie ein
- * Konflikt aus.
  */
 export function speichereSync({ repo, token }) {
   const alt = ladeSync();
@@ -518,15 +512,7 @@ export function speichereSync({ repo, token }) {
     repo: String(repo ?? '').trim(),
     token: token === undefined ? alt.token : String(token ?? '').trim(),
   };
-  const ok = schreib(SCHLUESSEL.sync, JSON.stringify(neu));
-  if (ok) {
-    try {
-      localStorage.removeItem(SCHLUESSEL.syncStand);
-    } catch {
-      /* egal */
-    }
-  }
-  return ok;
+  return schreib(SCHLUESSEL.sync, JSON.stringify(neu));
 }
 
 /** Löscht nur das Token; das Repo bleibt, damit es nicht neu getippt werden muss. */
@@ -537,36 +523,6 @@ export function loescheToken() {
 
 export function tokenHinterlegt() {
   return ladeSync().token.length > 0;
-}
-
-/**
- * Der zuletzt gesehene `sha` je Datensatz — die Konfliktbremse (PRD §4.5).
- * `art` ist 'katalog' oder 'reisen'.
- *
- * Geht verloren, wenn iOS den Storage räumt (§4.5). Dann holt der Sync die
- * `sha` vor dem Schreiben per GET nach — sonst antwortet die API mit 422 statt
- * mit einem erkennbaren Konflikt.
- */
-export function ladeSyncStand(art) {
-  const roh = lies(SCHLUESSEL.syncStand);
-  if (!roh) return null;
-  try {
-    const stand = JSON.parse(roh)?.[art];
-    return stand && typeof stand.sha === 'string' ? stand : null;
-  } catch {
-    return null;
-  }
-}
-
-export function speichereSyncStand(art, stand) {
-  let bisher = {};
-  try {
-    bisher = JSON.parse(lies(SCHLUESSEL.syncStand) ?? '{}') ?? {};
-  } catch {
-    bisher = {};
-  }
-  bisher[art] = { sha: String(stand?.sha ?? ''), zeit: stand?.zeit ?? new Date().toISOString() };
-  return schreib(SCHLUESSEL.syncStand, JSON.stringify(bisher));
 }
 
 /* --- Kleinkram ------------------------------------------------------------- */

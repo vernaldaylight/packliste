@@ -179,22 +179,6 @@ export function mengeFuer(regel, tage) {
   }
 }
 
-/** Kurzbeschreibung einer Mengenregel für die Katalogansicht. */
-export function regelText(regel) {
-  switch (regel?.art) {
-    case 'fest':
-      return `${regel.n}×`;
-    case 'pro_tage': {
-      const teile = [`${regel.n} pro ${regel.pro_tage} Tage`];
-      if (Number.isFinite(regel.max) && regel.max > 0) teile.push(`max ${regel.max}`);
-      return teile.join(', ');
-    }
-    case 'einmal':
-      return 'einmal';
-    default:
-      return '—';
-  }
-}
 
 /* --- Tag-Ableitung (PRD §4.3) ---------------------------------------------- */
 
