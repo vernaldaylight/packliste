@@ -10,7 +10,7 @@
  * Dateiweg der einzige, der noch geht.
  */
 
-import { h, karte, dateiWaehler, fmtZeitraum } from './dom.js';
+import { h, karte, dateiWaehler, fmtZeitraum, fmtFortschritt } from './dom.js';
 import { reisetage, tripTags, fortschritt, KATEGORIEN } from '../engine.js';
 import { findePackliste } from '../store.js';
 import { importiereKatalog } from './dateien.js';
