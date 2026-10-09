@@ -327,8 +327,21 @@
         const feld = app.querySelector('.retro-text');
         feld.value = 'Blasenpflaster gefehlt';
         feld.dispatchEvent(new Event('input'));
+
+        /* Erst der Knopf, der bleiben soll: er darf den Hash NICHT anfassen. */
+        knopfMit(app, 'Speichern und hier bleiben').click();
+        await warte();
+        pruefe('„Speichern und hier bleiben" bleibt auf der Seite', location.hash === '#/retro/smoke-1', location.hash);
+        pruefe('die Retro-Ansicht steht danach noch', text().includes('Was hat gefehlt?'));
+        pruefe(
+          'Retro wird auch beim Bleiben gespeichert',
+          JSON.parse(localStorage.getItem('packliste.reisen')).reisen[0].retro === 'Blasenpflaster gefehlt'
+        );
+
+        /* Und der andere Knopf führt zurück zur Übersicht. */
         knopfMit(app, 'Speichern').click();
         await warte();
+        pruefe('„Speichern" führt zur Übersicht', location.hash === '#/', location.hash);
         const retro = JSON.parse(localStorage.getItem('packliste.reisen')).reisen[0].retro;
         pruefe('Retro wird gespeichert', retro === 'Blasenpflaster gefehlt', JSON.stringify(retro));
 

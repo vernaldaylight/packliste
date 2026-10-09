@@ -37,10 +37,16 @@ export function ansichtRetro({ daten, aktionen, reiseId }) {
   });
   feld.value = text;
 
+  /**
+   * `zurueck === null` heißt „hier bleiben". Das ist kein Pfad, sondern ein
+   * Neuzeichnen: `gehe('/')` würde die Retro-Ansicht verlassen, obwohl der
+   * Knopf das Gegenteil verspricht.
+   */
   function speichern(zurueck) {
     aktionen.aktualisiereReise(reise.id, { retro: text.trim() });
     aktionen.melde(`Retro zu „${reise.name}" gespeichert.`, 'ok');
-    aktionen.gehe(zurueck ?? '/');
+    if (zurueck === null) aktionen.render();
+    else aktionen.gehe(zurueck);
   }
 
   const itemVorlage = JSON.stringify(
