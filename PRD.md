@@ -1,6 +1,6 @@
 # Packliste — Product Requirements Document
 
-**Version**: 1.10
+**Version**: 1.12
 **Datum**: 2026-10-09
 **Autor**: Sarah
 **Status**: Abgestimmt — bereit für die Umsetzung. Technische Architektur entschieden (§3.6). Der Katalog-Editor ist aus dem MVP in die erste Überarbeitung verschoben (FF-16).
@@ -90,7 +90,7 @@ Der Item-Katalog ist **fest und gepflegt**. Die Reise ist der **variable Input**
 
 Der Nutzer beschreibt eine Reise (Ziel, Zeitraum, Saison, Aktivitäten, Verkehrsmittel). Die App leitet daraus Kontext-Tags ab, schneidet sie mit den Tags des Katalogs, berechnet Mengen und gruppiert das Ergebnis nach Kategorie.
 
-Für unbekannte Aktivitäten lässt sich ein neuer Tag frei eintippen — die App ist damit nicht auf die heute bekannten Kontexte beschränkt.
+Das Vokabular der Kontexte steht fest: fünf Gruppen in `TAG_GRUPPEN` (Basis, Klima/Saison, Aktivität, Verkehrsmittel, Unterkunft). Ein neuer Kontext ist eine **Katalogänderung** — er muss an den Items stehen, sonst träfe er keines. Die App wächst über den Katalog, nicht über das Formular (1.11).
 
 ### 3.2 Entschiedene Grundsatzfragen
 
@@ -112,7 +112,7 @@ Für unbekannte Aktivitäten lässt sich ein neuer Tag frei eintippen — die Ap
 | F5 | Ergebnisliste, gruppiert nach Kategorie, abhakbar | P0 |
 | F6 | Manuelles Nachjustieren pro Reise (ohne Katalogänderung) | P0 |
 | F7 | Excel/CSV-Import des bestehenden Bestands | P0 |
-| F8 | Freie neue Tags/Aktivitäten im Reise-Formular anlegen | P0 |
+| F8 | Freie neue Tags/Aktivitäten im Reise-Formular anlegen | **entfällt** (1.11) — Tags werden nur noch gewählt |
 | F9 | Verkehrsmittel als Tag-Quelle (kein Regelwerk) | P0 |
 | F10 | Liste als Text/Markdown exportieren | P1 |
 | F11 | Reise speichern und später wieder öffnen | P1 |
@@ -246,11 +246,11 @@ Reise {
   ziel?: string
   von: date
   bis: date                       // -> reisetage
-  saison: "Winter" | "Sommer" | "Übergangszeit"
+  saison: string[]                // ["Winter", "Regen"] — Mehrfachauswahl (1.11)
   aktivitaeten: string[]          // ["Tauchen", "Schnorcheln"]
   verkehrsmittel: "Flugzeug" | "Auto" | "Zug"
   unterkunft: "Camping" | "Ferienwohnung" | "Hotel" | "Hostel" | "Freunde"
-  zusatz_tags: string[]           // manuell ergänzt/entfernt
+  zusatz_tags: string[]           // über Schalter (Reiseapotheke); der Rest ist Altbestand (1.11)
   teilnehmer: Teilnehmer[]        // leer = Reise ohne Personen (§4.6)
 }
 
@@ -267,7 +267,7 @@ Eine Reise ohne `teilnehmer` ist der Altbestand und verhält sich wie vor dem Pe
 **Verkehrsmittel und Unterkunft sind keine Sonderfälle, sondern Tag-Quellen.** Es gibt kein Regelwerk und keine Warnungen: `Flugzeug` ist ein Tag wie jeder andere, und Items wie Nackenkissen, Wollsocken oder der 1-L-Zip-Beutel tragen ihn. Wer mit dem Auto fährt, bekommt diese Items einfach nicht — und dafür alle Items mit Tag `Auto`. Dasselbe gilt für die Unterkunft: Wer im Hotel schläft, braucht kein Handtuch und keinen Föhn.
 
 Die **abgeleiteten Reise-Tags** sind die Vereinigung aus:
-`{saison} ∪ aktivitaeten ∪ {verkehrsmittel} ∪ {unterkunft} ∪ zusatz_tags ∪ {"Allgemein"}`
+`{saison-Tags} ∪ aktivitaeten ∪ {verkehrsmittel} ∪ {unterkunft} ∪ zusatz_tags ∪ {"Allgemein"}`
 
 ### 4.4 Packliste (Ergebnis)
 
@@ -377,7 +377,7 @@ Zwei Menschen, eine Reise. Bisher war das nicht abbildbar: es gab **eine** Packl
 ### 5.1 Algorithmus
 
 ```
-tripTags = {saison} ∪ aktivitaeten ∪ {verkehrsmittel} ∪ {unterkunft} ∪ zusatz_tags ∪ {"Allgemein"}
+tripTags = {saison-Tags} ∪ aktivitaeten ∪ {verkehrsmittel} ∪ {unterkunft} ∪ zusatz_tags ∪ {"Allgemein"}
 
 für jedes item im Katalog:
     wenn item.nicht_mit ∩ tripTags ≠ ∅   -> überspringen
@@ -398,7 +398,7 @@ sortieren: Kategorien in fester Reihenfolge, Items alphabetisch
 tripTagsFuerPerson = tripTags(reise) ∪ teilnehmer.aktivitaeten ∪ {Geschlechtstag}
 ```
 
-Die Aktivitäten der Person werden **nach** `entfernte_tags` hinzugefügt und gewinnen damit: sie sind die ausdrückliche Angabe dieser Person, ein Streichen an der Reise gilt für sie nicht. `Damen`/`Herren` stehen **nicht** in `TAG_GRUPPEN` — sie sind kein Reise-Kontext, sondern eine Personen-Eigenschaft, und tauchen deshalb in keinem Chip und keiner Vorschlagsliste des Reise-Formulars auf.
+Die Aktivitäten der Person werden **nach** `entfernte_tags` hinzugefügt und gewinnen damit: sie sind die ausdrückliche Angabe dieser Person, ein Streichen an der Reise gilt für sie nicht. `Damen`/`Herren` stehen **nicht** in `TAG_GRUPPEN` — sie sind kein Reise-Kontext, sondern eine Personen-Eigenschaft, und tauchen deshalb in keinem Chip des Reise-Formulars auf.
 
 #### Das Geschlecht steht in `nicht_mit`, nicht in `tags`
 
@@ -518,11 +518,11 @@ Der Import endet mit einer Zusammenfassung: Anzahl importierter Items, Konflikte
 > Als Nutzerin möchte ich eine Reise in einem Formular beschreiben, damit die App weiß, was ich brauche.
 
 **Akzeptanzkriterien**
-- [ ] Felder: Name, Ziel, Zeitraum, Saison, Aktivitäten, Verkehrsmittel, Unterkunft
+- [ ] Felder: Name, Ziel, Zeitraum, Saison (Mehrfachauswahl), Aktivitäten (Mehrfachauswahl), Verkehrsmittel, Unterkunft
 - [ ] Reisetage werden aus dem Zeitraum berechnet und angezeigt
 - [ ] Abgeleitete Tags sind sichtbar und einzeln entfernbar
-- [ ] Neuen Tag/Aktivität frei eintippen und für die Reise verwenden
-- [ ] Auswahl der Saison/Aktivität als Vorschlagsliste plus Freitext
+- [ ] Saison und Aktivitäten sind mehrfach wählbar — Winter + Regen bzw. Tauchen + Fotografie gleichzeitig (1.11)
+- [ ] Jeder Kontext ist ein Schalter aus dem festen Vokabular; kein Tag wird eingetippt (1.11)
 
 ### US-04 — Packliste erzeugen
 > Als Nutzerin möchte ich auf Knopfdruck eine Packliste bekommen, damit ich nicht mehr selbst auswähle.
@@ -616,7 +616,7 @@ Der Import endet mit einer Zusammenfassung: Anzahl importierter Items, Konflikte
 | FR2 | Item hat genau eine Kategorie und beliebig viele Tags | P0 |
 | FR3 | Drei Mengenregel-Varianten; Editor-Vorschau „= 4 Stück für 10 Tage" | P0 — Varianten P0, Editor-Vorschau erst mit FF-16. Die *berechnete* Menge bleibt in der fertigen Liste sichtbar (FR7, FR8) |
 | FR4 | Reise-Formular mit automatischer Tag-Ableitung | P0 |
-| FR5 | Freitext-Tags im Formular anlegen | P0 |
+| FR5 | Freitext-Tags im Formular anlegen | **entfällt** (1.11) — Tags werden nur noch gewählt |
 | FR6 | Regel-Engine mit Tag-Schnittmenge und Ausschluss | P0 |
 | FR7 | Mengenberechnung aus Reisedauer | P0 |
 | FR8 | Gruppierte, abhakbare Ausgabe | P0 |
@@ -857,7 +857,7 @@ Gespeichert als flache Strings; gruppiert nur für die Darstellung im Formular.
 
 `Camping` liegt unter **Unterkunft**, nicht unter Aktivität — man übernachtet beim Camping, das ist die Variable, die die Ausrüstung bestimmt. `Zelt` als eigener Tag entfällt damit.
 
-`Damen` und `Herren` stehen bewusst **nicht** in der Tabelle der Reise-Kontexte: sie gehören zu einer Person, nicht zu einer Reise. Sie stehen in `PERSON_TAGS` und tauchen in keinem Chip und keiner Vorschlagsliste des Reise-Formulars auf. Im Katalog wirken sie ausschließlich in `nicht_mit` — die Begründung steht in §5.1.
+`Damen` und `Herren` stehen bewusst **nicht** in der Tabelle der Reise-Kontexte: sie gehören zu einer Person, nicht zu einer Reise. Sie stehen in `PERSON_TAGS` und tauchen in keinem Chip des Reise-Formulars auf. Im Katalog wirken sie ausschließlich in `nicht_mit` — die Begründung steht in §5.1.
 
 Eine **Anlass**-Gruppe entfällt ersatzlos.
 
@@ -867,7 +867,7 @@ Eine **Anlass**-Gruppe entfällt ersatzlos.
 |---|---|
 | **Reiseapotheke** | Hat die Kategorie `Medizin` von `Allgemein` gelöst. Die 47 Medizin-Items waren ein Drittel jeder Packliste (47 von 151 Positionen auf einer typischen Reise) — eine Reiseapotheke packt man aber nicht in dieser Breite ein. Der Tag steht unter **Basis**, weil er wie `Allgemein` die Grundausstattung beschreibt, nicht einen Anlass |
 | **Übergangszeit** | Zwischen Winter und Sommer liegt der Großteil der Reisen. Ohne diesen Tag gibt es für milde Reisen keine saubere Auswahl — man landet bei Winter oder Sommer und packt falsch |
-| **Regen** | Regenjacke, Schirm, wasserdichte Schuhe. Trifft jede Jahreszeit und ist unabhängig von der Saison |
+| **Regen** | Regenjacke, Schirm, wasserdichte Schuhe. Trifft jede Jahreszeit und ist unabhängig von der Saison — deshalb ist `saison` seit 1.11 eine **Mehrfachauswahl**: `Regen` tritt neben die Jahreszeit, statt sie zu ersetzen. Vorher war der Tag nicht erreichbar: er stand in der Gruppe, aber nicht in der Auswahlliste |
 | **Flugzeug / Auto / Zug** | Ausdrücklicher Wunsch. Ersetzt jedes Verkehrsmittel-Regelwerk durch Tags (§4.3) |
 | **Wandern** | Sehr häufige Aktivität; eigene Ausrüstung (Stöcke, Blasenpflaster, Rucksack) |
 | **Strand** | Handtuch, Strandtasche, Sonnenschutz, Schnorchel — überschneidet sich mit Sommer, aber nicht deckungsgleich |
@@ -880,7 +880,7 @@ Eine **Anlass**-Gruppe entfällt ersatzlos.
 | **Hostel** | Wie Hotel, plus Schloss für Schließfach, Ohrstöpsel, Flip-Flops für Gemeinschaftsduschen |
 | **Freunde** | Übernachtung bei Bekannten: Geschenk, kein Handtuch nötig, dafür weniger Gepäck |
 
-**Bewusst nicht aufgenommen**: `Tropen`, `Winterurlaub`, `Business` — noch zu spekulativ. Tags lassen sich jederzeit frei eintippen (F3); wenn ein Tag nach drei Reisen immer noch fehlt, kommt er in diese Liste.
+**Bewusst nicht aufgenommen**: `Tropen`, `Winterurlaub`, `Business` — noch zu spekulativ. Sie im Formular einzutippen half nicht (1.11): ein Tag, den kein Item trägt, ändert an der Liste nichts. Wenn ein Kontext nach drei Reisen immer noch fehlt, kommt er in diese Liste — und zugleich an die Items.
 
 #### B.3 Bezug zum Import
 
@@ -898,7 +898,7 @@ Dabei entstehen zwei Lücken, die der Import-Report (F7) ausweisen muss:
 | Flache Tag-Liste wie im Excel | Kann nur filtern, nicht auswählen. Wäre der Status quo mit neuer Oberfläche |
 | Datenbank im MVP | Für Einzelnutzer mit lokaler Datei kein Nutzen, nur Betriebsaufwand |
 | Mengen als Ja/Nein | Lässt den realen Fehlerfall "zu wenig für 10 Tage" bestehen |
-| Tags als feste Enum-Liste | Hätte genau das Feature verhindert, das der Nutzer ausdrücklich will: unbekannte Aktivitäten eintippen |
+| Tags als feste Enum-Liste | **Teilweise übernommen (1.11)**: das Vokabular steht fest (`TAG_GRUPPEN`), neue Kontexte kommen über eine Katalogänderung statt über das Formular. Das Eintippen hat den Zweck verfehlt — ein Tag ohne Item trifft nichts |
 | Getrenntes Frontend/Backend | Kein Mehrbenutzerbetrieb, kein geteilter Zustand, keine Geheimnisse, die nur serverseitig liegen dürften. Ein zweiter Prozess wäre reiner Zusatzaufwand |
 | Python-Backend (FastAPI/Flask) | Rechnet nichts, was der Browser nicht rechnet. Python bleibt allein beim einmaligen Import-Skript (§3.6) |
 | Heroku | Seit Nov 2022 kein Free Tier, und es will einen laufenden Server, den diese App nicht braucht. Statisches Hosting ist das passende Werkzeug |
@@ -922,6 +922,8 @@ Dabei entstehen zwei Lücken, die der Import-Report (F7) ausweisen muss:
 
 | Version | Datum | Änderung |
 |---|---|---|
+| 1.12 | 2026-10-09 | **`Übergangszeit` greift jetzt an der Kleidung.** `Dünne Jacke` und `Dünner Schal` hingen nur an `Winter` — eine milde Reise brachte damit 83 Items und **keine Jacke** außer der `Regenjacke`, obwohl Anhang B.2 den Tag genau dafür eingeführt hat („für milde Reisen keine saubere Auswahl"). Beide tragen jetzt `Winter` **und** `Übergangszeit`: im Winter bleiben sie, in der Übergangszeit kommen sie neu dazu. 85 statt 83 Items auf einer milden Reise. Das ist kein `nicht_mit`-Fall, sondern ein fehlender positiver Tag (§5.3) |
+| 1.11 | 2026-10-09 | **Tags werden nur noch gewählt, `Regen` wird ein Klima-Tag — und `saison` eine Mehrfachauswahl.** Die drei Freitextfelder im Reise-Formular fallen weg: unter „Aktivitäten", unter „Zusätzliche Tags" und in jeder Personenzeile, samt Vorschlagsliste. Sie versprachen, einen neuen Tag anzulegen, wirkten aber nur, wenn der Katalog den Tag bereits exakt so trug — und da *jeder* im Katalog benutzte Tag ohnehin in `TAG_GRUPPEN` stand, war der Nutzen null und die Verwirrung real: drei Felder, zwei Ziele (`aktivitaeten` vs. `zusatz_tags`), ein gemeinsamer Vorschlagsvorrat. Ein neuer Kontext ist eine Katalogänderung; **F8 und FR5 entfallen** (beide P0). `Regen` war bis dahin unerreichbar: er stand in der Gruppe „Klima / Saison" (Anhang B.2) und wurde von `Gummistiefel` und `Schirm` getragen, aber `SAISONS` zählte nur drei Werte auf — man kam nur über den Freitext an ihn. `SAISONS` wird jetzt wie `AKTIVITAETEN` und `BASIS_TAGS` aus `TAG_GRUPPEN` **abgeleitet**, damit Vokabular und Gruppe nicht mehr auseinanderlaufen können. Wäre `Regen` ein vierter Schalter unter Entweder-oder-Bedingungen, würde er die Jahreszeit *ersetzen*: auf einer verregneten Winterreise fiele die Winter-Auswahl weg. Deshalb ist **`saison` eine Mehrfachauswahl** (`["Winter", "Regen"]`) — das PRD begründet den Tag ohnehin als „unabhängig von der Saison". Der Altwert als einzelner String bleibt lesbar (`saisonListe` in der Engine); die Migration liegt in `normalisiereDaten`, durch das Laden, Import und Sync-Merge ohnehin alle laufen. Ein Wert außerhalb des Vokabulars — Altbestand oder ein zweites Gerät mit alter Version — bleibt als entfernbarer Chip sichtbar, sonst wäre er unsichtbar und unlöschbar. Katalogseitig hat 1.10 (`Städtetrip` entfällt) `Schirm` auf `Camping`/`Regen` verengt — seitdem führt an Schirm und Gummistiefeln ohne Camping nur noch `Regen` vorbei, weshalb der Tag nicht länger im toten Winkel stehen darf |
 | 1.10 | 2026-10-09 | **Tag `Städtetrip` entfällt.** Er trug genau ein Item (`Schirm`) und diente dort allein dem Ausschluss-Fall aus §5.3 — ohne ihn ist die Liste der Reise-Kontexte ehrlicher, und §5.3 zeigt sein Beispiel jetzt am Geschlecht (`Binden`), dem einzigen Ausschluss, den der Katalog heute wirklich braucht. `Devil Sticks` und `Poi` hängen nur noch an `Festival` statt an `Camping`/`Festival`: es sind Jongliergeräte, keine Zeltausrüstung. Nachtrag zu 1.9: die Geschlechts-Markierung im Katalog ist inzwischen erfolgt — 16 Items tragen `Damen` bzw. `Herren` in `nicht_mit`, die Notiz in 1.9 („steht noch aus") ist damit erledigt |
 | 1.9 | 2026-10-08 | **Personen — das Fundament für zwei Menschen auf einer Reise.** Neues globales Register `daten.personen` (`{id, name, geschlecht}`) und `reise.teilnehmer` (`{person_id, aktivitaeten}`); eine Reise mit zwei Teilnehmern ergibt **zwei** Packlisten, jede mit eigenem Fortschritt. Datenstand `version: 2`, neuer §4.6, neuer Tag-Ort `PERSON_TAGS` in Anhang B.2, O14–O16. **Der Schlüssel einer Packliste ist jetzt das Paar `(reise_id, person_id)`** — über `reise_id` allein überschriebe die zweite Person still die Liste der ersten. Alle vier Nähte, über die ein Reise-Datensatz hereinkommt (`localStorage`, Import-Datei, Sync, Ersetzen beim Import), gehen jetzt durch `normalisiereDaten`; drei davon zählten die Felder vorher selbst auf und hätten `personen` verloren. Alte Stände bleiben ohne Migration lesbar, alten Listen wird kein `person_id` angedichtet. **Geschlecht als Tag, aber in `nicht_mit`:** als positives Tag ließe sich „nur für ihn" nicht mit „nur im Sommer" kombinieren — `Badehose` wäre auf der Winterreise oder bei allen dabei (§5.1). Die Liste einer Person liegt unter `#/liste/:reiseId/:personId`, die alte Adresse bleibt gültig. Das Löschen einer Person entfernt keine Listen. FF-05/FF-06 bleiben offen und sind jetzt als solche benannt. Katalogseitig steht die Geschlechts-Markierung noch aus — bis dahin greift kein Ausschluss, und beide Geschlechter-Items kommen mit |
 | 1.8 | 2026-10-08 | **Auslieferung von Vercel auf GitHub Pages umgestellt.** Vercel lieferte unter der Projekt-Domain eine fremde Next.js-App aus, während die eigenen Deployments seit Stunden als „blocked" scheiterten — der Wirt war nicht mehr nachvollziehbar. Pages liegt im selben Repo wie der Code, das Deployment steht als Datei darin statt in einem Dashboard. Zwei Eigenheiten, die dabei zu beachten sind: Projekt-Seiten liegen unter `/packliste/`, deshalb setzt `vite.config.js` ein `base` — **nur beim Bauen**, damit Entwicklungsserver, Rauchtest und die absoluten Fixture-Pfade unverändert bleiben. Und weil die App über `location.hash` routet, braucht es keine `404.html`-Krücke für Deep-Links. Kopfzeile dieses Dokuments von 1.2 auf den Stand der Historie gezogen |
