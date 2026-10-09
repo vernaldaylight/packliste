@@ -349,7 +349,14 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
           )
         ),
         h('div', { class: 'tag-reihe' }, h('span', { class: 'klein' }, 'Geschlecht:'), ...geschlecht),
-        h('div', { class: 'tag-reihe' }, h('span', { class: 'klein' }, 'Nur hier:'), aktivitaeten)
+        // „Zusätzlich" und nicht „Nur hier": diese Aktivitäten kommen zu denen
+        // der Reise dazu, sie ersetzen sie nicht. Ohne Namen bleibt nur das Wort.
+        h(
+          'div',
+          { class: 'tag-reihe' },
+          h('span', { class: 'klein' }, person.name ? `Zusätzlich für ${person.name}:` : 'Zusätzlich:'),
+          aktivitaeten
+        )
       );
     });
 
@@ -376,16 +383,11 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
         : null;
 
     personenAnzeige.replaceChildren(
-      ...(entwurf.teilnehmer.length === 0
-        ? [
-            h(
-              'p',
-              { class: 'feld-hinweis' },
-              'Ohne Personen entsteht eine Liste für die Reise als Ganzes. Mit Personen entsteht je Person eine eigene Liste — mit ihrem Geschlecht und ihren eigenen Aktivitäten.'
-            ),
-          ]
-        : zeilen.filter(Boolean)),
-      hinzufuegen
+      ...zeilen.filter(Boolean),
+      // `hinzufuegen` ist `null`, wenn niemand mehr zum Hinzufügen übrig ist.
+      // Ungefiltert macht `replaceChildren` daraus einen Textknoten „null" —
+      // der stand dann über dem Eingabefeld.
+      ...(hinzufuegen ? [hinzufuegen] : [])
     );
   }
 
@@ -408,7 +410,7 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
       return aktionen.render();
     }
     if (!entwurf.von || !entwurf.bis) {
-      aktionen.melde('Bitte Von- und Bis-Datum angeben — daraus kommt die Reisedauer und damit jede Menge.', 'fehler');
+      aktionen.melde('Bitte Von- und Bis-Datum angeben — daraus kommt die Reisedauer und damit die Menge der Gegenstände.', 'fehler');
       return aktionen.render();
     }
     if (reisetage(entwurf.von, entwurf.bis) === 0) {
@@ -493,11 +495,6 @@ export function ansichtReise({ katalog, daten, aktionen, reiseId }) {
 
     karte(
       'Personen',
-      h(
-        'p',
-        { class: 'feld-hinweis' },
-        'Wer mitfährt, bekommt eine eigene Liste — und damit einen eigenen Fortschritt. Das Geschlecht und die Aktivitäten hier gelten nur für diese eine Person.'
-      ),
       personenAnzeige,
       neuePersonFeld
     ),

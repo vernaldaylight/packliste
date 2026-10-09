@@ -126,12 +126,17 @@ export function ansichtListe({ katalog, daten, aktionen, reiseId, personId = nul
 
   function zeichneKopf() {
     const s = fortschritt(liste.positionen);
+    // `replaceChildren` filtert `null` nicht heraus, sondern macht daraus den
+    // Textknoten „null" — anders als `h()`, das in `dom.js` überspringt. Die
+    // beiden bedingten Kinder kommen deshalb als Liste.
+    const umschalter = personenUmschalter();
+    const personZeile = aktiv
+      ? h('p', { class: 'klein' }, `Liste für ${aktiv.person.name}${geschlechtText(aktiv.person)}`)
+      : null;
     kopfBereich.replaceChildren(
-      personenUmschalter(),
+      ...(umschalter ? [umschalter] : []),
       h('h1', {}, reise.name),
-      aktiv
-        ? h('p', { class: 'klein' }, `Liste für ${aktiv.person.name}${geschlechtText(aktiv.person)}`)
-        : null,
+      ...(personZeile ? [personZeile] : []),
       h('p', { class: 'klein' }, fmtZeitraum(reise.von, reise.bis, tage), reise.ziel ? ` · ${reise.ziel}` : ''),
       h(
         'p',

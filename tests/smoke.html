@@ -215,6 +215,10 @@
         pruefe('Anna angelegt', Boolean(await legePersonAn('Anna', 'weiblich', 'Fotografie')));
         pruefe('Ben angelegt', Boolean(await legePersonAn('Ben', 'maennlich', 'Arbeit')));
         pruefe('zwei Personen im Formular', app.querySelectorAll('.person-zeile').length === 2);
+        // `replaceChildren` macht aus einem `null`-Argument den Textknoten
+        // „null" (anders als `h()`); ohne die Filter stand er über dem Feld
+        // „Neue Person …".
+        pruefe('kein „null" im Formular', !/\b(null|undefined)\b/.test(app.textContent));
 
         const erzeugeListen = knopfMit(app, 'Liste neu erzeugen');
         pruefe('Knopf „Liste neu erzeugen" vorhanden', Boolean(erzeugeListen));
@@ -233,6 +237,9 @@
 
         // Die Adresse aus dem Erzeugen zeigt auf die erste Person — Anna.
         pruefe('erste Liste gehört Anna', text().includes('Liste für Anna'));
+        // Auch hier stand ohne Filter ein „null" im Kopf, sobald es keinen
+        // Personen-Umschalter gab oder keine Person aktiv war.
+        pruefe('kein „null" im Listenkopf', !/\b(null|undefined)\b/.test(app.textContent));
         pruefe('Anna hat Binden', namenAufListe().includes('Binden'));
         pruefe('Anna hat Bikini', namenAufListe().includes('Bikini'));
         pruefe('Anna hat kein Badehose', !namenAufListe().includes('Badehose'));
